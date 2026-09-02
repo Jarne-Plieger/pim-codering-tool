@@ -1,0 +1,2600 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>PIM Codering Tool — Plieger</title>
+<style>
+  :root{
+    --ink:#1c2b2a; --paper:#f6f4ee; --card:#ffffff; --line:#d9d5c7;
+    --accent:#0f6e56; --accent-dim:#e1f5ee; --warn:#993c1d; --warn-dim:#faece7;
+    --mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    padding: 32px 20px 80px;
+  }
+  .wrap{max-width:880px; margin:0 auto;}
+  header{margin-bottom:32px;}
+  .eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); margin:0 0 6px;}
+  h1{font-size:26px; font-weight:700; margin:0 0 8px; letter-spacing:-.01em;}
+  .sub{color:#5a5f52; font-size:14px; line-height:1.5; max-width:640px;}
+  .step{
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:20px 22px; margin-bottom:16px; position:relative;
+  }
+  .step-num{
+    position:absolute; left:-14px; top:18px; width:28px; height:28px; border-radius:50%;
+    background:var(--ink); color:var(--paper); font-family:var(--mono); font-size:13px;
+    display:flex; align-items:center; justify-content:center; font-weight:700;
+  }
+  .step h2{font-size:15px; margin:0 0 4px 10px; font-weight:700;}
+  .step p.hint{margin:0 0 14px 10px; font-size:13px; color:#6b6f61;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-left:10px;}
+  .drop{
+    border:1.5px dashed var(--line); border-radius:8px; padding:14px 12px; text-align:center;
+    cursor:pointer; transition:.15s; font-size:13px; background:#fbfaf6; min-height:64px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    position:relative;
+  }
+  .drop:hover{border-color:var(--accent); background:var(--accent-dim);}
+  .drop.filled{border-style:solid; border-color:var(--accent); background:var(--accent-dim);}
+  .drop .label{font-weight:600; color:var(--ink);}
+  .drop .file{font-family:var(--mono); font-size:11px; color:var(--accent); word-break:break-all;}
+  .drop input{display:none;}
+  .drop .clear-btn{
+    display:none; position:absolute; top:6px; right:8px; width:18px; height:18px; line-height:16px;
+    border-radius:50%; border:1px solid var(--line); background:var(--paper); color:#6b6f61;
+    font-size:12px; text-align:center; cursor:pointer; z-index:2;
+  }
+  .drop.filled .clear-btn{display:block;}
+  .drop .clear-btn:hover{background:var(--warn); color:#fff; border-color:var(--warn);}
+  .persist-tag{font-size:10px; font-family:var(--mono); color:#8a8d7f; margin-top:2px;}
+  button.go{
+    margin-left:10px; background:var(--ink); color:var(--paper); border:none; border-radius:8px;
+    padding:12px 24px; font-size:14px; font-weight:700; cursor:pointer; letter-spacing:.01em;
+  }
+  button.go:disabled{background:#b6b4a6; cursor:not-allowed;}
+  button.go:hover:not(:disabled){background:#000;}
+  .log{
+    margin-left:10px; margin-top:14px; font-family:var(--mono); font-size:12px; color:#5a5f52;
+    background:#fbfaf6; border:1px solid var(--line); border-radius:8px; padding:12px 14px;
+    max-height:200px; overflow-y:auto; white-space:pre-wrap; display:none;
+  }
+  .summary{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:14px 0 6px 10px;}
+  .metric{background:#fbfaf6; border:1px solid var(--line); border-radius:8px; padding:10px 12px;}
+  .metric .n{font-size:20px; font-weight:700;}
+  .metric .l{font-size:11px; color:#6b6f61; text-transform:uppercase; letter-spacing:.04em;}
+  .metric.warn .n{color:var(--warn);}
+  .downloads{display:flex; gap:10px; margin:16px 0 4px 10px;}
+  a.dl{
+    background:var(--accent); color:#fff; text-decoration:none; padding:11px 20px;
+    border-radius:8px; font-size:13px; font-weight:700; display:inline-flex; align-items:center; gap:8px;
+  }
+  a.dl:hover{background:#0b5744;}
+  .footnote{font-size:12px; color:#6b6f61; margin-left:10px; margin-top:10px; line-height:1.5;}
+  .badge{display:inline-block; font-family:var(--mono); font-size:10px; padding:2px 6px; border-radius:4px; background:var(--warn-dim); color:var(--warn); margin-left:6px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Plieger — PIM coderingstool</p>
+    <h1>Deel 1 &amp; deel 2 uit een PAB-bestand</h1>
+    <p class="sub">Draait volledig in je browser — er wordt niets naar een server gestuurd. Upload de naslagbestanden en het PAB-bestand, en krijg twee ingevulde SAP-importbestanden terug om te downloaden.</p>
+    <button onclick="clearPersisted()" style="margin-top:10px; background:none; border:1px solid var(--line); border-radius:6px; padding:6px 12px; font-size:12px; color:#6b6f61; cursor:pointer;">Opgeslagen bestanden wissen</button>
+  </header>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <h2>Naslagbestanden</h2>
+    <p class="hint">Worden onthouden in je browser (IndexedDB) — upload alleen opnieuw als je een nieuwere versie hebt.</p>
+    <div class="grid2">
+      <div class="drop" id="drop-sales"><span class="clear-btn" data-key="sales">&times;</span><span class="label">Salescodes_assortiment</span><span class="file" data-default=".xlsx — klik of sleep">.xlsx — klik of sleep</span><input type="file" id="f-sales" accept=".xlsx,.xls"><span class="persist-tag">wordt onthouden</span></div>
+      <div class="drop" id="drop-class"><span class="clear-btn" data-key="klas">&times;</span><span class="label">Classificatiecodes / navigatiecodes</span><span class="file" data-default=".xlsx — klik of sleep">.xlsx — klik of sleep</span><input type="file" id="f-class" accept=".xlsx,.xls"><span class="persist-tag">wordt onthouden</span></div>
+      <div class="drop" id="drop-groep"><span class="clear-btn" data-key="groep">&times;</span><span class="label">Salesgroepen overzicht</span><span class="file" data-default=".xlsx — klik of sleep">.xlsx — klik of sleep</span><input type="file" id="f-groep" accept=".xlsx,.xls"><span class="persist-tag">wordt onthouden</span></div>
+      <div class="drop" id="drop-cn"><span class="clear-btn" data-key="cn">&times;</span><span class="label">Goederencodes (intrastat)</span><span class="file" data-default=".pdf (EU-tarieflijst) of .xlsx — optioneel">.pdf (EU-tarieflijst) of .xlsx — optioneel</span><input type="file" id="f-cn" accept=".xlsx,.xls,.pdf"><span class="persist-tag">wordt onthouden</span></div>
+      <div class="drop" id="drop-leveranciers"><span class="clear-btn" data-key="leveranciers">&times;</span><span class="label">Leveranciers (nummers)</span><span class="file" data-default=".xlsx — Plieger leveranciersnummers">.xlsx — Plieger leveranciersnummers</span><input type="file" id="f-leveranciers" accept=".xlsx,.xls"><span class="persist-tag">wordt onthouden</span></div>
+      <div style="display:flex; align-items:center; justify-content:center; color:#8a8d7f; font-size:12px;">↑ eenmalig, blijft daarna bewaard in deze browser</div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <h2>Workflow deel 1 &amp; deel 2</h2>
+    <p class="hint">Leeg sjabloon → wordt onthouden (altijd hetzelfde bestand). Al deels ingevuld vanuit PIM → wordt <b>niet</b> onthouden, want dat verschilt per batch, net als je PAB-bestand.</p>
+    <div class="grid2">
+      <div class="drop" id="drop-t1"><span class="clear-btn" data-key="t1">&times;</span><span class="label">Workflow deel 1</span><span class="file" data-default=".xlsx — leeg of deels ingevuld">.xlsx — leeg of deels ingevuld</span><input type="file" id="f-t1" accept=".xlsx"></div>
+      <div class="drop" id="drop-t2"><span class="clear-btn" data-key="t2">&times;</span><span class="label">Workflow deel 2</span><span class="file" data-default=".xlsx — leeg of deels ingevuld">.xlsx — leeg of deels ingevuld</span><input type="file" id="f-t2" accept=".xlsx"></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <h2>PAB-export <span style="font-weight:400; color:#6b6f61;">(alleen optioneel als deel 1/2 al artikeldata bevatten)</span></h2>
+    <p class="hint">Alleen nodig als deel 1/deel 2 hierboven nog leeg zijn. Staat er al data in deel 1/deel 2 vanuit PIM? Dan mag je dit overslaan.</p>
+    <div class="grid2" style="grid-template-columns:1fr;">
+      <div class="drop" id="drop-pab"><span class="clear-btn" data-key="pab">&times;</span><span class="label">PAB-bestand</span><span class="file" data-default=".xlsx of .xls — klik of sleep">.xlsx of .xls — klik of sleep</span><input type="file" id="f-pab" accept=".xlsx,.xls"></div>
+    </div>
+    <p class="hint" style="margin-top:14px;">Alleen deze artikelen uit het PAB verwerken <span style="font-weight:400;">(optioneel — leeg = alles verwerken)</span></p>
+    <textarea id="f-artnrs" placeholder="Artikelnummers of EAN's, één per regel (of gescheiden door komma's/spaties)" style="width:100%; min-height:80px; font-family:var(--mono); font-size:12px; border:1px solid var(--line); border-radius:8px; padding:10px 12px; resize:vertical;"></textarea>
+    <p class="hint" id="source-status" style="margin-top:10px; font-weight:600;"></p>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <h2>Leverancierslijst <span style="font-weight:400; color:#6b6f61;">(optioneel)</span></h2>
+    <p class="hint">Voor leveranciers die niet (goed) aan 2BA/PAB gekoppeld zitten: upload hier de eigen productlijst van de leverancier (.xlsx/.csv, of een foto/screenshot). De tool herkent zelf welke kolom artikelnummer/EAN/omschrijving bevat en haalt daar o.a. kleuren uit die niet uit het PAB te halen zijn.</p>
+    <div class="grid2" style="grid-template-columns:1fr;">
+      <div class="drop" id="drop-leverancierlijst"><span class="clear-btn" data-key="leverancierlijst">&times;</span><span class="label">Leverancierslijst</span><span class="file" data-default=".xlsx/.csv of foto/screenshot — optioneel">.xlsx/.csv of foto/screenshot — optioneel</span><input type="file" id="f-leverancierlijst" accept=".xlsx,.xls,.csv,.png,.jpg,.jpeg"></div>
+    </div>
+  </div>
+
+  <div class="step">
+    <div class="step-num">5</div>
+    <h2>AI-aanvulling voor intrastat <span style="font-weight:400; color:#6b6f61;">(optioneel)</span></h2>
+    <p class="hint">Voor artikelen zonder eigen én zonder vergelijkbaar-artikel intrastat-code: laat een AI-model met websearch op tarief.douane.nl zoeken. Kost je eigen Anthropic-tegoed (enkele centen per artikel) — sla over als je dit liever zelf nakijkt.</p>
+    <div class="grid2" style="grid-template-columns:1fr;">
+      <input type="password" id="f-apikey" placeholder="sk-ant-... (je eigen Anthropic API-key, wordt lokaal onthouden)" style="width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:8px; font-family:var(--mono); font-size:12px;">
+    </div>
+    <label style="display:flex; align-items:center; gap:8px; margin-top:10px; font-size:13px; color:#3a3f33;">
+      <input type="checkbox" id="f-use-ai"> Gebruik AI-zoekopdracht voor ontbrekende intrastat-codes
+    </label>
+  </div>
+
+  <div class="step">
+    <div class="step-num">6</div>
+    <h2>Verwerken</h2>
+    <p class="hint">Zoekt salescodes, navigatiecategorieën en intrastat-codes op en vult beide sjablonen.</p>
+    <button class="go" id="btn-run" disabled>Verwerk artikelen</button>
+    <div class="log" id="log"></div>
+    <div class="summary" id="summary" style="display:none;"></div>
+    <div class="downloads" id="downloads" style="display:none;"></div>
+    <p class="footnote" id="footnote" style="display:none;">
+      Omschrijving 1/2 zijn een <b>voorstel</b> op basis van het producttype — controleer kleur en verkorting zelf.
+      Salescode/navigatiecategorie/intrastat zijn automatisch opgezocht; <span class="badge">vetgedrukt</span> = onzeker, graag verifiëren.
+    </p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+const state = { sales:null, klas:null, groep:null, cn:null, cnParsed:null, t1:null, t2:null, pab:null, t1HasData:false, t2HasData:false };
+
+function log(msg){
+  const el = document.getElementById('log');
+  el.style.display = 'block';
+  el.textContent += msg + '\n';
+  el.scrollTop = el.scrollHeight;
+}
+
+function setFilled(dropId, filename){
+  const d = document.getElementById(dropId);
+  d.classList.add('filled');
+  d.querySelector('.file').textContent = filename;
+}
+
+function wireDrop(dropId, inputId, onFile){
+  const drop = document.getElementById(dropId);
+  const input = document.getElementById(inputId);
+  drop.addEventListener('click', ()=>input.click());
+  drop.addEventListener('dragover', e=>{e.preventDefault(); drop.style.borderColor='var(--accent)';});
+  drop.addEventListener('drop', e=>{
+    e.preventDefault();
+    if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0], dropId, onFile);
+  });
+  input.addEventListener('change', e=>{
+    if(e.target.files.length) handleFile(e.target.files[0], dropId, onFile);
+  });
+}
+
+async function handleFile(file, dropId, onFile){
+  setFilled(dropId, file.name);
+  const buf = await file.arrayBuffer();
+  await onFile(buf, file.name);
+  checkReady();
+}
+
+async function detectExistingRows(buf){
+  try{
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+    const ws = wb.worksheets.find(w=>/product|article/i.test(w.name)) || wb.worksheets[wb.worksheets.length-1];
+    for(let r=4; r<=ws.rowCount; r++){
+      const row = ws.getRow(r);
+      let hasData = false;
+      row.eachCell({includeEmpty:false}, cell=>{ if(norm(cell.value)!=='') hasData = true; });
+      if(hasData) return true;
+    }
+    return false;
+  }catch(e){ return false; }
+}
+
+function checkReady(){
+  const refsReady = state.sales && state.klas && state.groep && state.leveranciers && state.t1 && state.t2;
+  const heeftLeverancierlijstArtikelen = !!(state.leverancierlijstLookup && state.leverancierlijstLookup.artikelen && state.leverancierlijstLookup.artikelen.length);
+  const sourceReady = !!state.pab || state.t1HasData || state.t2HasData || heeftLeverancierlijstArtikelen;
+  document.getElementById('btn-run').disabled = !(refsReady && sourceReady);
+  const statusEl = document.getElementById('source-status');
+  if(!refsReady){ statusEl.textContent = ''; return; }
+  if(sourceReady){
+    statusEl.style.color = 'var(--accent)';
+    statusEl.textContent = state.pab
+      ? 'Bron: PAB-bestand.'
+      : state.t1HasData || state.t2HasData
+        ? 'Bron: bestaande data in deel 1/deel 2 (vanuit PIM).'
+        : 'Bron: leverancierslijst (artikelen niet gekoppeld aan 2BA/PAB).';
+  } else {
+    statusEl.style.color = 'var(--warn)';
+    statusEl.textContent = 'Lever een PAB-bestand aan, upload deel 1/deel 2 met daarin al artikeldata vanuit PIM, of upload een leverancierslijst.';
+  }
+}
+
+const DB_NAME = 'pim_codering_tool';
+const DB_STORE = 'bestanden';
+function dbOpen(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = ()=>{ req.result.createObjectStore(DB_STORE); };
+    req.onsuccess = ()=>resolve(req.result);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+async function dbSet(key, buf, filename){
+  try{
+    const db = await dbOpen();
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(DB_STORE,'readwrite');
+      tx.objectStore(DB_STORE).put({buf, filename, savedAt: Date.now()}, key);
+      tx.oncomplete = ()=>resolve(true);
+      tx.onerror = ()=>reject(tx.error);
+    });
+  }catch(e){ return false; }
+}
+async function dbGet(key){
+  try{
+    const db = await dbOpen();
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(DB_STORE,'readonly');
+      const req = tx.objectStore(DB_STORE).get(key);
+      req.onsuccess = ()=>resolve(req.result || null);
+      req.onerror = ()=>reject(req.error);
+    });
+  }catch(e){ return null; }
+}
+async function dbDelete(key){
+  try{
+    const db = await dbOpen();
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction(DB_STORE,'readwrite');
+      tx.objectStore(DB_STORE).delete(key);
+      tx.oncomplete = ()=>resolve(true);
+      tx.onerror = ()=>reject(tx.error);
+    });
+  }catch(e){ return false; }
+}
+
+async function tryLoadPersisted(){
+  const keys = {sales:'drop-sales', klas:'drop-class', groep:'drop-groep', leveranciers:'drop-leveranciers', cn:'drop-cn', t1:'drop-t1', t2:'drop-t2'};
+  for(const key in keys){
+    const rec = await dbGet(key);
+    if(rec && rec.buf){
+      state[key] = rec.buf;
+      setFilled(keys[key], rec.filename + ' (opgeslagen)');
+      if(key==='t1') state.t1HasData = await detectExistingRows(state.t1);
+      if(key==='t2') state.t2HasData = await detectExistingRows(state.t2);
+    }
+  }
+  const apiKeyRec = await dbGet('apikey');
+  if(apiKeyRec && apiKeyRec.buf){
+    document.getElementById('f-apikey').value = new TextDecoder().decode(apiKeyRec.buf);
+  }
+  const cnParsedRec = await dbGet('cn_parsed');
+  if(cnParsedRec && cnParsedRec.buf){
+    try{
+      state.cnParsed = JSON.parse(new TextDecoder().decode(cnParsedRec.buf));
+      setFilled('drop-cn', `${cnParsedRec.filename} — ${state.cnParsed.length} codes (opgeslagen)`);
+    }catch(e){}
+  }
+  checkReady();
+}
+document.getElementById('f-apikey').addEventListener('change', e=>{
+  dbSet('apikey', new TextEncoder().encode(e.target.value).buffer, 'apikey');
+});
+
+async function clearPersisted(){
+  try{
+    const db = await dbOpen();
+    const tx = db.transaction(DB_STORE,'readwrite');
+    tx.objectStore(DB_STORE).clear();
+  }catch(e){}
+  location.reload();
+}
+
+wireDrop('drop-sales','f-sales', async (buf,name)=>{ state.sales = buf; dbSet('sales', buf, name); });
+wireDrop('drop-class','f-class', async (buf,name)=>{ state.klas = buf; dbSet('klas', buf, name); });
+wireDrop('drop-groep','f-groep', async (buf,name)=>{ state.groep = buf; dbSet('groep', buf, name); });
+wireDrop('drop-leveranciers','f-leveranciers', async (buf,name)=>{ state.leveranciers = buf; dbSet('leveranciers', buf, name); });
+wireDrop('drop-cn','f-cn', async (buf,name)=>{
+  state.cn = buf;
+  if(/\.pdf$/i.test(name)){
+    const dropEl = document.getElementById('drop-cn');
+    dropEl.querySelector('.file').textContent = name + ' — wordt uitgelezen...';
+    try{
+      const rows = await parsePDFGoederencodes(buf, (p,total)=>{
+        dropEl.querySelector('.file').textContent = `${name} — pagina ${p}/${total}...`;
+      });
+      state.cnParsed = rows;
+      await dbSet('cn_parsed', new TextEncoder().encode(JSON.stringify(rows)).buffer, name);
+      dropEl.querySelector('.file').textContent = `${name} — ${rows.length} codes gevonden`;
+    }catch(e){
+      dropEl.querySelector('.file').textContent = `${name} — fout bij uitlezen: ${e.message}`;
+    }
+  } else {
+    dbSet('cn', buf, name);
+  }
+});
+wireDrop('drop-pab','f-pab', async buf=>{ state.pab = buf; });
+wireDrop('drop-leverancierlijst','f-leverancierlijst', async (buf,name)=>{
+  state.leverancierlijst = buf;
+  const dropEl = document.getElementById('drop-leverancierlijst');
+  const isAfbeelding = /\.(png|jpe?g)$/i.test(name);
+  if(isAfbeelding){
+    const apiKey = norm(document.getElementById('f-apikey').value);
+    if(!apiKey){
+      dropEl.querySelector('.file').textContent = name + ' — vul eerst je Anthropic API-key in (stap onderaan) om een foto te laten uitlezen';
+      state.leverancierlijstLookup = null;
+      return;
+    }
+    dropEl.querySelector('.file').textContent = name + ' — wordt door AI uitgelezen...';
+    try{
+      const mimeType = /\.png$/i.test(name) ? 'image/png' : 'image/jpeg';
+      const result = await parseLeverancierlijstAfbeelding(buf, mimeType, apiKey);
+      state.leverancierlijstLookup = result;
+      dropEl.querySelector('.file').textContent = `${name} — ${result.artikelen.length} artikelen, ${result.nGevonden} kleuren gevonden (AI)`;
+    }catch(e){
+      dropEl.querySelector('.file').textContent = `${name} — fout bij uitlezen: ${e.message}`;
+      state.leverancierlijstLookup = null;
+    }
+  } else {
+    try{
+      const result = parseLeverancierlijstSpreadsheet(buf);
+      state.leverancierlijstLookup = result;
+      dropEl.querySelector('.file').textContent = `${name} — ${result.artikelen.length} artikelen, ${result.nGevonden} kleuren gevonden`;
+    }catch(e){
+      dropEl.querySelector('.file').textContent = `${name} — fout bij uitlezen: ${e.message}`;
+      state.leverancierlijstLookup = null;
+    }
+  }
+});
+wireDrop('drop-t1','f-t1', async (buf,name)=>{
+  state.t1 = buf;
+  state.t1HasData = await detectExistingRows(buf);
+  if(state.t1HasData){
+    document.getElementById('drop-t1').querySelector('.file').textContent = name + ' — batch-specifiek, wordt niet onthouden';
+  } else {
+    dbSet('t1', buf, name);
+  }
+});
+wireDrop('drop-t2','f-t2', async (buf,name)=>{
+  state.t2 = buf;
+  state.t2HasData = await detectExistingRows(buf);
+  if(state.t2HasData){
+    document.getElementById('drop-t2').querySelector('.file').textContent = name + ' — batch-specifiek, wordt niet onthouden';
+  } else {
+    dbSet('t2', buf, name);
+  }
+});
+
+tryLoadPersisted();
+
+function norm(v){
+  if(v===null||v===undefined) return '';
+  if(typeof v === 'object'){
+    if('result' in v) return norm(v.result);
+    if('text' in v) return norm(v.text);
+    if('richText' in v) return v.richText.map(t=>t.text).join('').trim();
+    if(v instanceof Date) return v.toISOString();
+    return '';
+  }
+  return String(v).replace(/\r\n/g,'\n').replace(/\r/g,'\n').trim();
+}
+
+// Merknaam normaliseren naar titel-case (GROHE -> Grohe), ongeacht hoe de leverancier het in het
+// PAB-bestand aanlevert - voorkomt dat een leverancier die toevallig ALLES IN HOOFDLETTERS aanlevert
+// dat 1-op-1 doorzet naar het PIM-veld.
+function titleCase(s){
+  return norm(s).toLowerCase().replace(/(^|[\s\-])([a-zà-ÿ])/g, (m,sep,ch)=>sep+ch.toUpperCase());
+}
+
+async function readWorkbook(buf){
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buf);
+  return wb;
+}
+
+if(window.pdfjsLib){
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+const RELEVANTE_PREFIXEN = ['3917','3922','3925','6910','7307','7322','7324','7412','7418','7609','8413','8414','8415','8419','8481','8482','8516','9028','9032'];
+
+async function parsePDFGoederencodes(buf, onProgress){
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  const rows = [];
+  const codeLineRe = /^\s*(\d{4}(?:\s\d{2}){0,3})\s+[–\-\s]*(.+?)\s*\.\s*\.\s*\./;
+  for(let p=1; p<=pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const regels = {};
+    for(const item of content.items){
+      const y = Math.round(item.transform[5]);
+      regels[y] = (regels[y] || '') + item.str;
+    }
+    const tekstregels = Object.values(regels);
+    for(const regel of tekstregels){
+      const m = regel.match(codeLineRe);
+      if(!m) continue;
+      const code = m[1].replace(/\s/g,'');
+      if(code.length < 8) continue;
+      if(!RELEVANTE_PREFIXEN.some(pre=>code.startsWith(pre))) continue;
+      const oms = m[2].trim();
+      if(oms.length < 3) continue;
+      rows.push([code, oms]);
+    }
+    if(onProgress && p % 50 === 0) onProgress(p, pdf.numPages);
+  }
+  return rows;
+}
+
+function readWorkbookSJS(buf){
+  return XLSX.read(new Uint8Array(buf), {type:'array', cellDates:false, dense:true});
+}
+
+function sjsCell(ws, r0, c0){
+  if(ws['!data']) return ws['!data'][r0] ? ws['!data'][r0][c0] : undefined;
+  const rowArr = ws[r0];
+  if(Array.isArray(rowArr)) return rowArr[c0];
+  const addr = XLSX.utils.encode_cell({r:r0, c:c0});
+  return ws[addr];
+}
+
+function sjsMaxRow(ws){
+  const ref = ws['!ref'];
+  if(!ref) return 0;
+  return XLSX.utils.decode_range(ref).e.r;
+}
+
+function sheetRowsSJS(ws, headerRow, startRow, endRow){
+  const headerR0 = headerRow - 1;
+  const headers = {};
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  for(let c0=range.s.c; c0<=range.e.c; c0++){
+    const cell = sjsCell(ws, headerR0, c0);
+    const h = norm(cell ? cell.v : '');
+    if(h) headers[c0] = h;
+  }
+  const rows = [];
+  const last = endRow ? (endRow-1) : sjsMaxRow(ws);
+  for(let r0=startRow-1; r0<=last; r0++){
+    const obj = {};
+    let hasData = false;
+    for(const c0 in headers){
+      const cell = sjsCell(ws, r0, c0);
+      const v = cell ? cell.v : '';
+      obj[headers[c0]] = v;
+      if(norm(v) !== '') hasData = true;
+    }
+    if(hasData) rows.push(obj);
+  }
+  return rows;
+}
+
+function sheetRowsNoHeaderSJS(ws, startRow){
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const rows = [];
+  for(let r0=startRow-1; r0<=range.e.r; r0++){
+    const vals = [];
+    let hasData = false;
+    for(let c0=range.s.c; c0<=range.e.c; c0++){
+      const cell = sjsCell(ws, r0, c0);
+      const v = cell ? cell.v : '';
+      vals.push(v);
+      if(norm(v)!=='') hasData = true;
+    }
+    if(hasData) rows.push(vals);
+  }
+  return rows;
+}
+
+const PRODUCTTYPE_ABBR = [
+  [/douchevloer/i,'DOUCHEVL'], [/meerlagenbuis met mantel/i,'ML.BUIS MAN.'],
+  [/meerlagenbuis ge.?isoleerd/i,'ML.BUIS BSD'], [/pe-rt meerlagenbuis/i,'PE-RT ML.BUIS'],
+  [/meerlagenbuis gas/i,'ML.BUIS GAS'], [/meerlagenbuis/i,'ML.BUIS'],
+  [/instortverdeler/i,'INSTORTV.'], [/ventielcollector/i,'VENTIELCOLL.'],
+  [/wastafelmengkraan|wastafelkraan/i,'WASTKR.'], [/keukenkraan/i,'KEUKENKR.'],
+  [/douchekraan/i,'DOUCHEKR.'], [/badkraan/i,'BADKR.'], [/thermostaatkraan/i,'THERMOKR.'],
+  [/douchemengkraan/i,'DOUCHEMENGKR.'], [/badmengkraan/i,'BADMENGKR.'],
+  [/mengkraan/i,'MENGKR.'], [/tapkraan/i,'TAPKR.'], [/inbouwkraan/i,'INBOUWKR.'],
+  [/bedieningsplaat/i,'BED.PLAAT'], [/afdektablet/i,'AFDEKTABLET'],
+  [/wandcloset|wand-wc/i,'WAND-WC'], [/staand wc/i,'STAAND WC'], [/reservoir/i,'RESERVOIR'],
+  [/wc-zitting/i,'WC-ZITTING'], [/wc-zitring/i,'WC-ZITRING'], [/wc-pack/i,'WC-PACK'],
+  [/doucheslang/i,'DOUCHESLANG'], [/hoofddouche(?:set)?/i, 'HOOFDDOUCHE'],
+  [/geluidsisolatieset/i,'GELUIDSISOL.'], [/muurplaat\s*combinatie/i,'MUURPLAAT COMBINATIE'], [/muurplaat/i,'MUURPLAAT'],
+  [/verloopset|verl\.?\s*set/i,'VERL.SET'], [/membraan/i,'MEMBRAAN'], [/beluchter/i,'BELUCHTER'],
+  [/knelkoppeling|fitting\s*met\s*\d+\s*aansluiting(en)?/i,'FITTING'],
+  [/douchebak/i,'DOUCHEBAK'], [/badkuip|ligbad|\bbad\b|bade[wnr]/i,'BADKUIP'], [/handdoekradiator/i,'HANDD.RAD.'],
+  [/radiator/i,'RADIATOR'], [/handdoekhouder/i,'HANDD.HOUD.'], [/toiletborstelhouder/i,'TOILETB.H.'],
+  [/toiletrolhouder/i,'TOILETROLH.'], [/douchestang/i,'DOUCHEST.'], [/glijstang/i,'GLIJST.'],
+  [/douchekop/i,'DOUCHEKOP'], [/inbouwmengkraan/i,'INBOUWMENGKR.'], [/zeephouder/i,'ZEEPHOUDER'],
+  [/closetrolhouder/i,'TOILETROLH.'], [/tandenborstelhouder/i,'TANDENB.HOUD.'],
+  [/badafvoer-inlaatcombinatie|badafvoercombinatie|badafvoer/i,'BADAFVOERCOMB.'],
+  [/douchezuil\/paneel|douchezuil/i,'DOUCHEZUIL'],
+  [/zeepdispenser/i,'ZEEPDISP.'], [/handdoekhaak/i,'HANDD.HAAK'], [/planchet/i,'PLANCHET'],
+  [/opklapbare handgreep/i,'OPKL.HANDGR.'], [/handgreep/i,'HANDGREEP'], [/douchezitting/i,'DOUCHEZIT.'],
+  [/thermostaatmengblok/i,'THERMOBL.'], [/inbouwdeel/i,'INBOUWDEEL'], [/afbouwdeel/i,'AFBOUWDEEL'],
+  [/douchesysteem/i,'DOUCHESYST.'], [/handdouche/i,'HANDDOUCHE'], [/hoofddouche/i,'HOOFDDOUCHE'],
+  [/af-?\s*en\s*overloopgarnituur|overloopgarnituur|afvoerplug|afvoergarnituur/i,'AFVOERGAR.'],
+  [/wastafel/i,'WASTAFEL'], [/spoelbak/i,'SPOELBAK'],
+  [/rozet/i,'ROZET'], [/afdekset/i,'AFDEKSET'],
+  [/brandmanchet/i,'BRANDMANCH.'], [/zelfklevende\s*tape|duct\s*tape|weefsel\s*tape|aluminium\s*tape/i,'TAPE'],
+  [/kabelbinder/i,'KABELBINDER'], [/reciprozaagblad/i,'RECIPROZAAGBL.'], [/plamuurmes|spatel/i,'SPATEL'],
+  [/\brasp\b/i,'RASP'], [/veiligheidshandschoen/i,'VEILIGH.HANDSCH.'], [/combinatietang/i,'COMBI.TANG'],
+  [/afteken.*meetgereedschap|meetgereedschap/i,'MEETGEREEDSCH.'], [/vuilwaterdompelpomp/i,'DOMPELPOMP'],
+  [/condenswaterpomp/i,'CONDENSPOMP'], [/kabelbuisklem/i,'KABELBUISKLEM'], [/schroefbevestigingsset/i,'BEVESTIGINGSSET'],
+  [/spoelreservoirvlotterkraan|vlotterkraan/i,'VLOTTERKRAAN'],
+  [/bedieningsplaat|bedieningsknop/i,'BEDIENINGSPLAAT'], [/uitlaatklep/i,'UITLAATKLEP'], [/uitstroommechanisme/i,'UITSTROOMMECH.'],
+];
+
+// Kleurafkortingen — altijd afgeleid van de Nederlandse naam, ook bij Engelse brontekst
+const KLEUR_ABBR = [
+  [/mat[\s.]*zwart|matte?\s*black/i, 'MAT.ZW.'], [/zwart|black/i, 'ZWA.'],
+  [/mat[\s.]*chroom|matte?\s*chrome/i, 'MAT.CHR.'], [/chroom|chrome/i, 'CHR.'],
+  [/geborsteld[\s.]*staal|brushed\s*steel/i, 'GEB.STA.'],
+  [/geborsteld[\s.]*brons|brushed\s*bronze/i, 'GEB.BRO.'],
+  [/geborsteld[\s.]*koper|brushed\s*copper/i, 'GEB.KOP.'],
+  [/geborsteld[\s.]*goud|brushed\s*gold/i, 'GEB.GOU.'],
+  [/geborsteld[\s.]*nikkel|brushed\s*nickel/i, 'GEB.NIK.'],
+  [/antraciet[\s.]*mat|anthracite\s*matte?/i, 'ANT.MAT'], [/antraciet|anthracite/i, 'ANT.'],
+  [/zilvergrijs|silver\s*gr[ae]y/i, 'ZIL.GRI.'], [/grijs|gr[ae]y/i, 'GRI.'],
+  [/blauw|blue/i, 'BLA.'], [/rood|red/i, 'ROO.'], [/bruin|brown/i, 'BRU.'],
+  [/goud|gold/i, 'GOU.'], [/bronz?e|brons/i, 'BRO.'], [/koper|copper/i, 'KOP.'],
+  [/beton[\s.]*bei[gz]e|concrete\s*beige/i, 'BET.BEI.'], [/beige/i, 'BEI.'], [/zand|sand/i, 'ZAN.'],
+  [/wit[\s.]*hoogglans|white\s*high\s*gloss/i, 'WIT.HG.'], [/wit[\s.]*zijdemat|white\s*silk\s*matte?/i, 'WIT.ZM.'],
+  [/wit[\s.]*glanzend|white\s*gloss/i, 'WIT.GL.'], [/wit[\s.]*mat|matte?\s*white/i, 'MAT.WIT'],
+  [/klei[\s.]*terra[\s.]*mat/i, 'KLE.TER.MAT'], [/naturel|natural/i, 'NAT.'],
+  [/wall?nut[\s.]*dark/i, 'WAL.D.'], [/supersteel/i, 'SUP.STL.'], [/wit|white/i, 'WIT'],
+];
+
+// Generieke fallback voor kleuren die niet in de vaste lijst staan (bijv. fabrikant-eigen namen als
+// "Cool Sunrise", "Hard Graphite", "Supersteel") - zelfde mechanische regel als de vaste afkortingen:
+// elk woord max 3 tekens + punt (uitzondering: woorden van 3 tekens of korter blijven heel, geen punt).
+// Dit is een GEGENEREERDE afkorting, geen geverifieerde - de aanroeper moet dit als onzeker markeren.
+function afkortKleurGeneriek(kleurVolledig){
+  const vertaal = {
+    'black':'zwart', 'white':'wit', 'blue':'blauw', 'red':'rood', 'brown':'bruin',
+    'grey':'grijs', 'gray':'grijs', 'gold':'goud', 'copper':'koper', 'bronze':'brons',
+    'steel':'staal', 'nickel':'nikkel', 'brushed':'geborsteld'
+  };
+  const woorden = norm(kleurVolledig).split(/\s+/).filter(Boolean);
+  const delen = woorden.map(w=>{
+    const wLower = w.toLowerCase().replace(/[^a-zà-ÿ]/g,'');
+    const vertaald = vertaal[wLower] || wLower;
+    if(vertaald.length <= 3) return vertaald.toUpperCase();
+    return vertaald.slice(0,3).toUpperCase()+'.';
+  });
+  return delen.join('.').replace(/\.\.+/g,'.');
+}
+
+// Navigatiecategorie -> producttype + EC-code. Wordt gebruikt als extra terugval wanneer de vrije
+// tekst geen bruikbaar producttype oplevert, maar de navigatiecategorie (vaak al rechtstreeks uit
+// het PAB aanwezig, ook als de classificatie zelf leeg is) wél een duidelijke hint geeft.
+const NAV_NAAR_PRODUCTTYPE = [
+  [/baden(?!.*toebehoren)/i, 'BADKUIP', 'EC011609:Bad'],
+  [/douchebakken/i, 'DOUCHEBAK', 'EC011443:Douchebak'],
+  [/wastafels/i, 'WASTAFEL', 'EC010104:Wastafel'],
+  [/toiletzittingen/i, 'WC-ZITTING', 'EC010108:Toiletzitting'],
+  [/wandclosets/i, 'WAND-WC', 'EC010107:Wandcloset'],
+  [/staande closets/i, 'STAAND WC', 'EC010106:Staand closet'],
+  [/opbouwreservoirs|inbouwreservoirs/i, 'RESERVOIR', 'EC010142:Spoelreservoir'],
+  [/handdouches/i, 'HANDDOUCHE', 'EC010161:Handdouche'],
+  [/doucheslangen/i, 'DOUCHESLANG', 'EC011535:Doucheslang'],
+  [/douchekranen/i, 'DOUCHEMENGKR.', 'EC011329:Douchemengkraan'],
+  [/badkranen/i, 'BADMENGKR.', 'EC010862:Badmengkraan'],
+];
+function guessProducttype(bronTekst, serie){
+  const s = norm(bronTekst);
+  const serieU = norm(serie).toUpperCase();
+  for(const [re, abbr] of PRODUCTTYPE_ABBR){ if(re.test(s)) return abbr; }
+  // Geen dictionary-match: meerdere betekenisvolle woorden meenemen (niet alleen het eerste), met
+  // overslaan van cijfers/maten/stopwoorden/de serienaam, tot een redelijke lengte (ruimte overlaten
+  // voor een eventuele kleur-/straalsoorten-toevoeging die later nog volgt).
+  const stopwoorden = ['voor','van','met','en','of','the','a','an'];
+  const woorden = s.split(/\s+/).filter(Boolean);
+  const serieWoorden = serieU.split(/\s+/);
+  const gekozen = [];
+  let lengte = 0;
+  for(const w of woorden){
+    const wU = w.toUpperCase().replace(/[,.:;]+$/,'');
+    if(!wU || /^\d/.test(wU) || wU.length < 3) continue;
+    if(stopwoorden.includes(wU.toLowerCase())) continue;
+    if(wU === serieU || serieWoorden.includes(wU)) continue;
+    // Materiaal-/afwerkingswoorden (geglazuurd, geborsteld, mat, enz.) en kwalificatie-/keurmerklabels
+    // (antislip, klasse) zijn nooit een producttype
+    if(KLEUR_SIGNAL.test(w) || /geglazuurd|antislip|titanium.?staal|\bstaal\b/i.test(w) || /^(klasse|sense|bade|voeteind|rechts|links|overloop|verloop|achter|voor)$/i.test(wU)) continue;
+    if(lengte + wU.length + (gekozen.length?1:0) > 26) break;
+    gekozen.push(wU);
+    lengte += wU.length + (gekozen.length>1?1:0);
+  }
+  if(gekozen.length) return gekozen.join(' ');
+  return 'ARTIKEL';
+}
+
+function guessKleurAfkorting(oms, kleurVeld){
+  const bron = norm(kleurVeld) || norm(oms);
+  for(const [re, abbr] of KLEUR_ABBR){ if(re.test(bron)) return {abbr:abbr, zeker:true}; }
+  return {abbr:'', zeker:true};
+}
+
+// Grohe-conventie: kleur zit vaak gecodeerd in de laatste tekens van het artikelnummer.
+// Dit is een patroonherkenning, geen bevestigde bron -- daarom altijd als onzeker gemarkeerd.
+// Grohe-conventie: kleur zit vaak gecodeerd in de laatste tekens van het artikelnummer, maar alleen
+// chroom (geen suffix) en zwart (2430/2431) zijn met voldoende zekerheid bekend. Voor de overige
+// suffixen (GN0/AL0/DL0/DC0 e.d.) weten we niet welke kleur het is — daar NIETS voor verzinnen,
+// ook geen placeholder-tekst zoals "KL.GN?", want dat is zelf al een vorm van raden.
+function guessKleurUitArtnr(artnr, merk){
+  if(!/grohe/i.test(norm(merk))) return null;
+  const a = norm(artnr).toUpperCase();
+  if(/(2430|2431)$/.test(a)) return { abbr:'MAT.ZW.', volledig:'Mat zwart' };
+  if(/0$/.test(a) && !/(00)$/.test(a) && !/(GN0|AL0|DL0|DC0)$/.test(a)) return { abbr:'CHR.', volledig:'Chroom' };
+  return null;
+}
+
+// Klinkers (behalve de allereerste letter) uit een woord verwijderen, één voor één van achteren
+// naar voren, tot de gevraagde lengte is bereikt of er geen klinkers meer over zijn. Nooit een woord
+// helemaal weghalen, en kleur/aantal-straalsoorten blijven altijd intact - alleen het producttype-deel
+// wordt zo nodig ingekort (bijv. DOUCHEMENGKR. -> DOUCHEMNGKR.).
+function verkortDoorKlinkersTeHalen(woord, doelLengte){
+  let letters = woord.split('');
+  for(let i = letters.length-1; i>0 && letters.join('').length > doelLengte; i--){
+    if(/[aeiouAEIOU]/.test(letters[i])) letters.splice(i,1);
+  }
+  return letters.join('');
+}
+
+function proposeO1(bronTekst, artnr, serie, origOms, merk){
+  const type = guessProducttype(bronTekst, serie);
+  let kleur = guessKleurAfkorting(bronTekst, '');
+  if(!kleur.abbr) kleur = guessKleurAfkorting(origOms, '');
+  let kleurOnzeker = false;
+  let kleurUitArtnr = null;
+  // Chroom/zwart-gokken op basis van het artikelnummer-einde is alleen betrouwbaar gekalibreerd voor
+  // zichtbaar kraanwerk (kranen, handdouches, douchekoppen) - niet voor elementen/reservoirs/accessoires,
+  // waar dezelfde eindcijfers niets met kleur te maken hebben. Daarom hier scopen op producttype.
+  const isZichtbaarKraanwerk = /kraan|handdouche|douchekop|-?kop\b|stang/i.test(type);
+  if(!kleur.abbr && isZichtbaarKraanwerk){
+    const gok = guessKleurUitArtnr(artnr, merk);
+    if(gok){ kleur = {abbr:gok.abbr, zeker:true}; kleurUitArtnr = gok; }
+  }
+  const brontekstVoorExtras = norm(origOms) || norm(bronTekst);
+  // Thermostatisch/thermostaat -> THERMO-prefix, zelfde conventie als THERMOKR./THERMOBL.
+  const isThermo = /thermosta(at|tisch)/i.test(brontekstVoorExtras);
+  // "N straalsoorten" -> "NSTR." (nooit een aantal verzinnen, alleen overnemen als het er letterlijk staat)
+  let straalsoorten = '';
+  const strMatch = brontekstVoorExtras.match(/(\d+)\s*straalsoort(en)?/i);
+  if(strMatch) straalsoorten = strMatch[1]+'STR.';
+
+  // Afmeting compact meenemen in O1 (zoals '1700X800X450MM') — vooral bij producten waar dezelfde
+  // serie alleen in maat verschilt (bijv. badkuipen/douchebakken) is dit een belangrijk onderscheid.
+  let afmetingO1 = '';
+  const afmMatchO1 = brontekstVoorExtras.match(/\b\d[\d.,\/]*\s*[x×]\s*\d[\d.,\/]*(?:\s*[x×]\s*\d[\d.,\/]*)?\s*(mm|cm|m²)\b/i);
+  if(afmMatchO1) afmetingO1 = afmMatchO1[0].replace(/\s+/g,'').toUpperCase();
+
+  // Technische specificaties uit de vaste lijst — alleen toevoegen als letterlijk aanwezig, nooit gokken.
+  const TECHSPEC_ABBR = [
+    [/\b1[\s.-]?greeps?\b|\beengreep/i,'1GR'], [/\b2[\s.-]?greeps?\b/i,'2GR'], [/\b3[\s.-]?greeps?\b/i,'3GR'],
+    [/opklapbaar/i,'OPKL.'], [/horizontale?\s*bocht/i,'HORI.BOCHT'], [/verticale?\s*bocht/i,'VERT.BOCHT'],
+    [/\bopbouw\b/i,'OPBOUW'], [/\binbouw\b/i,'INBOUW'], [/\bwandmontage\b/i,'WAND'],
+    [/wastafelmontage/i,'WAST.MONT.'], [/\biso\b|ge.?isoleerd/i,'ISO'],
+    [/comfort/i,'COMF.'], [/\bvital\b/i,'VITAL'], [/\bhero\b/i,'HERO'], [/dual\s*flush|\bdual\b/i,'DUAL'],
+    [/soft[\s-]?close|softclose/i,'SOFTCL.'], [/quick[\s-]?release/i,'QR.'],
+    [/zonder\s*afvoer|z\/afv\.?/i,'Z/AFV.'], [/met\s*afvoer|m\/afv\.?/i,'M/AFV.'],
+    [/\b90\s*(?:graden|°)/i,'90°'], [/\b45\s*(?:graden|°)/i,'45°'],
+  ];
+  let techspec = '';
+  for(const [re, abbr] of TECHSPEC_ABBR){
+    if(re.test(brontekstVoorExtras)){ techspec = abbr; break; }
+  }
+
+  // Prioritering bij ruimtegebrek (hoogste eerst = wordt nooit als eerste laten vallen):
+  // 1) kleur en afmeting (belangrijkste onderscheid tussen varianten binnen dezelfde serie)
+  // 2) straalsoorten (relevant bij douche-artikelen)
+  // 3) techspec (leukste-om-te-weten detail, wordt als eerste weggelaten)
+  const vasteDelen = [afmetingO1 || null, straalsoorten || null, techspec || null, kleur.abbr || null].filter(Boolean);
+  let thermoPrefix = isThermo ? 'THERMO' : '';
+  let typeAfk = type;
+  let result = [thermoPrefix, typeAfk, ...vasteDelen].filter(Boolean).join(' ');
+  if(result.length > 30 && techspec){
+    // Laagste prioriteit eerst laten vallen
+    const zonderTechspec = [afmetingO1 || null, straalsoorten || null, kleur.abbr || null].filter(Boolean);
+    result = [thermoPrefix, typeAfk, ...zonderTechspec].filter(Boolean).join(' ');
+    if(result.length <= 30){ vasteDelen.length = 0; vasteDelen.push(...zonderTechspec); }
+  }
+  // Kleur/afmeting/straalsoorten NOOIT laten vallen: eerst THERMO inkorten naar THER, dan klinkers uit
+  // het producttype-deel halen, altijd met behoud van deze belangrijkste onderscheidende kenmerken.
+  if(result.length > 30 && isThermo){
+    thermoPrefix = 'THER';
+    result = [thermoPrefix, typeAfk, ...vasteDelen].filter(Boolean).join(' ');
+  }
+  if(result.length > 30){
+    const teVeel = result.length - 30;
+    const doelLengteType = Math.max(typeAfk.length - teVeel, 3);
+    typeAfk = verkortDoorKlinkersTeHalen(typeAfk, doelLengteType);
+    result = [thermoPrefix, typeAfk, ...vasteDelen].filter(Boolean).join(' ');
+  }
+  return { tekst: result.slice(0,30), onzeker: kleurOnzeker, kleurUitArtnr };
+}
+
+async function zoekIntrastatViaAI(omschrijving, merk, serie, apiKey){
+  const prompt = `Zoek de correcte Nederlandse intrastat/HS-goederencode (8 cijfers, CBS-nummer) voor dit product op via tarief.douane.nl (Nederlandse douane tarievenlijst).
+
+Product: ${merk} ${serie} — ${omschrijving}
+
+Geef ALLEEN het 8-cijferige goederencode-nummer terug, zonder andere tekst. Als je het niet met voldoende zekerheid kunt vaststellen, antwoord dan met "ONBEKEND".`;
+
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 500,
+      messages: [{ role: 'user', content: prompt }],
+      tools: [{ type: 'web_search_20250305', name: 'web_search' }]
+    })
+  });
+
+  if(!response.ok){
+    const errText = await response.text();
+    throw new Error(`API-fout ${response.status}: ${errText.slice(0,150)}`);
+  }
+  const data = await response.json();
+  const tekst = (data.content || []).filter(b=>b.type==='text').map(b=>b.text).join(' ');
+  if(/ONBEKEND/i.test(tekst)) return null;
+  // Nederlandse douanecodes staan genoteerd als dddd.dd.dd of dddd dd dd
+  const genoteerd = tekst.match(/\b(\d{4})[.\s](\d{2})[.\s](\d{2})\b/);
+  if(genoteerd) return genoteerd[1]+genoteerd[2]+genoteerd[3];
+  const kaal = tekst.match(/\b\d{8}\b/);
+  return kaal ? kaal[0] : null;
+}
+
+// Officiële EU-tarieflijst (Uitvoeringsverordening (EU) 2025/1926) -- meest voorkomende
+// installatie-, sanitair-, verwarmings-, ventilatie- en elektracategorieën. Wordt als GRATIS eerste bron gebruikt, vóór AI.
+const CN_CODES_SANITAIR = [
+  [/thermostat.*kraan|thermostaatkraan|thermostatisch.*meng/i, '84818031'],
+  [/mengkraan|mengkranen/i, '84818011'],
+  [/kogelafsluiter|plugkraan/i, '84818081'],
+  [/vlinderklep/i, '84818085'],
+  [/kraan|kranen|afsluiter|klep/i, '84818039'],
+  [/wc-zitting|closetbril|wc-deksel/i, '39222000'],
+  [/porselein|keramiek.*wastafel|keramiek.*wasbak/i, '69101000'],
+  [/wastafel|wasbak|zuil voor wasbak/i, '69109000'],
+  [/badkuip|douchebak|bidet/i, '39221000'],
+  [/geiser|elektrische.*heetwater/i, '85161011'],
+  [/radiator/i, '73221900'],
+  [/koper.*sanitair|toiletartikel/i, '74182000'],
+  [/doucheslang|slang/i, '39173200'],
+  [/doucheset|douchegarnituur/i, '84818039'],
+  [/handdouche|hoofddouche|douchesysteem|douchekop/i, '84818039'],
+];
+
+function guessCNCode(oms, etimOms, customTable){
+  const s = norm(oms) + ' ' + norm(etimOms);
+  const tabel = (customTable && customTable.length) ? customTable : CN_CODES_SANITAIR;
+  for(const [re, code] of tabel){ if(re.test(s)) return code; }
+  return null;
+}
+
+// Splitst de rauwe PAB-productomschrijving in: schone nl-omschrijving (geen merk/serie/kleur/afmeting),
+// een kleur-kandidaat en een afmeting-kandidaat. Verzint nooit een kleurnaam: als er geen komma-segment
+// aan het eind staat, blijft het kleurveld leeg. De herkende (of onherkende) kleurtekst wordt altijd
+// woordelijk overgenomen uit de bron, nooit vertaald/bedacht.
+// Brede set herkenbare kleur/afwerkingswoorden (NL + gangbare fabrikant-afwerkingsnamen), puur om te
+// BESLISSEN of een stuk tekst kleur is - niet om een kleurnaam te verzinnen. Matcht niks? Dan blijft
+// de tekst intact (zoals "..., afvoer rechts" - dat is geen kleur en mag niet worden afgeknipt).
+const KLEUR_SIGNAL = /geborsteld|hoogglans|zijdemat|glans|mat\b|chroom|chrome|steel|sunrise|sunset|graphite|nickel|nikkel|copper|koper|gold|goud|black|zwart|white|wit\b|grey|gr[ai]s|brown|bruin|bronze|brons|titanium(?!-?staal)|blue|blauw|pink|roze|green|groen|red|rood|purple|paars|orange|oranje|yellow|geel/i;
+
+// Hansgrohe/AXOR-specifiek: officieel geverifieerde kleurcode-namen (Hansgrohe's eigen 'FinishPlus'
+// metallic-namen, bevestigd via Hansgrohe's documentatie) en de kleine, merk-eigen afkortingen die in
+// hun PAB-omschrijvingen gebruikt worden. Nooit gokken buiten deze bevestigde lijst.
+const HANSGROHE_KLEUR_DECODE = [
+  [/\bBBC\b/i, 'Brushed Black Chrome', 'BBC.'],
+  [/\bPGO\b/i, 'Polished Gold Optic', 'PGO'],
+  [/\bBBR\b/i, 'Brushed Bronze', 'BRO.'],
+  [/\bMAT\.?\s*ZWART\b|\bmz\b/i, 'Mat Zwart', 'MAT.ZW.'],
+  [/\bMAT\.?\s*WIT\b|\bmw\b/i, 'Mat Wit', 'MAT.WIT'],
+  [/\bchr(oom)?\b/i, 'Chroom', 'CHR.'],
+];
+function hansgroheKleurDecode(tekst){
+  for(const [patroon, naam, afk] of HANSGROHE_KLEUR_DECODE){
+    if(patroon.test(tekst)) return {naam, afk};
+  }
+  return {naam:'', afk:''};
+}
+
+// Hansgrohe/AXOR-specifiek: hun PAB-omschrijvingen zijn sterk afgekort (bijv. 'HG 1-gr dmk opbouw chr').
+// Deze afkortingen omzetten naar volledige NL-termen voor het nl-veld.
+const HANSGROHE_NL_VERVANG = [
+  [/\bhoofdd\b/i, 'hoofddouche'], [/\bhandd\b/i, 'handdouche'],
+  [/\bdslang\b|\bdslng\b/i, 'doucheslang'], [/\bopb\b/i, 'opbouw'], [/\binb\b|\binb\./i, 'inbouw'],
+  [/\bdmk\b/i, 'douchemengkraan'], [/\bbmk\b/i, 'badmengkraan'], [/\btherm\b/i, 'thermostatisch'],
+  [/\bShpipe\b/i, 'douchepijp'], [/(\d)j\b/i, '$1 straalsoorten'], [/(\d)jet\b/i, '$1 straalsoorten'],
+  [/\bEcoSmart\+?|\bESm\+|\bES\b/, 'EcoSmart'], [/\bcon\/cyl\b/i, 'conisch/cylindrisch'],
+  [/\bd-arm\b/i, 'douchearm'], [/\bplaf\.aansl\./i, 'plafondaansluiting'], [/\breno\b/i, 'renovatie'],
+  [/\bU'S\b/, 'Unica\'Storz'], [/\bbset\b/i, 'doucheset'], [/\bkleurset\b/i, 'kleurset'],
+];
+
+// Hansgrohe/AXOR-specifiek: ETIM-naam + navigatiecategorie per code, geverifieerd tegen het officiële
+// classificatiebestand (Referentie_voor_classificatiecodes_en_navigatiecodes) — nooit zelf verzinnen.
+const HANSGROHE_ETIM_NAV = {
+  'EC010862': ['Badmengkraan', '01.06.01:Badkranen:Staged:pliegerProductCatalog', 'BADMENGKR.'],
+  'EC010551': ['Handdoekhouder', '01.02.05:Handdoekhouders:Staged:pliegerProductCatalog', 'HANDD.HOUD.'],
+  'EC010161': ['Handdouche', '01.05.04.01:Handdouches:Staged:pliegerProductCatalog', 'HANDDOUCHE'],
+  'EC010109': ['Glijstangcombinatie', '01.05.04.04:Glijstangcombinatie:Staged:pliegerProductCatalog', 'GLIJSTANGCOMB.'],
+  'EC011327': ['Inbouwmengkraan', '01.06.04:Douchekranen:Staged:pliegerProductCatalog', 'INBOUWMENGKR.'],
+  'EC011329': ['Douchemengkraan', '01.06.04:Douchekranen:Staged:pliegerProductCatalog', 'DOUCHEMENGKR.'],
+  'EC010552': ['Handdoekhaak', '01.02.04:Haken:Staged:pliegerProductCatalog', 'HANDD.HAAK'],
+  'EC010557': ['Zeephouder', '01.02.09:Zeephouders:Staged:pliegerProductCatalog', 'ZEEPHOUDER'],
+  'EC011613': ['Douchezuil/paneel', '01.05.07:Douchesystemen:Staged:pliegerProductCatalog', 'DOUCHEZUIL'],
+  'EC011383': ['Douchekop', '01.05.04.06:Douchekoppen:Staged:pliegerProductCatalog', 'DOUCHEKOP'],
+  'EC010549': ['Zeepdispenser', '01.02.10:Zeeppompen:Staged:pliegerProductCatalog', 'ZEEPDISP.'],
+  'EC010553': ['Closetrolhouder', '01.02.08:Toiletrolrolhouders:Staged:pliegerProductCatalog', 'TOILETROLH.'],
+  'EC010848': ['Badafvoer-inlaatcombinatie', '01.03.05:Badafvoer:Staged:pliegerProductCatalog', 'BADAFVOERCOMB.'],
+  'EC011028': ['Handgreep aangepast sanitair', '01.02.01:Badgrepen:Staged:pliegerProductCatalog', 'HANDGREEP'],
+  'EC010561': ['Badafvoercombinatie', '01.03.05:Badafvoer:Staged:pliegerProductCatalog', 'BADAFVOERCOMB.'],
+  'EC011535': ['Doucheslang', '01.05.04.05:Doucheslangen:Staged:pliegerProductCatalog', 'DOUCHESLANG'],
+  'EC010556': ['Tandenborstelhouder', '01.02:Accessoires:Staged:pliegerProductCatalog', 'TANDENB.HOUD.'],
+};
+// Salescode-fallback per producttype: alleen D-groepen (nieuwe salesgroepen), dominante code binnen
+// die categorie in Salescodes_assortiment.xlsx. Nooit een niet-D-code gebruiken, ook niet als exacte
+// match — die zijn verouderd.
+const HANSGROHE_SALESCODE_FALLBACK = {
+  'EC010862': 'D51', 'EC010551': 'D55', 'EC010161': 'D50', 'EC010109': 'D50', 'EC011327': 'D45',
+  'EC011329': 'D51', 'EC010552': 'D55', 'EC010557': 'D50', 'EC011613': 'D45', 'EC011383': 'D50',
+  'EC010549': 'D55', 'EC010553': 'D55', 'EC010848': 'D56', 'EC011028': 'D55', 'EC010561': 'D56',
+  'EC011535': 'D50', 'EC010556': 'D55',
+};
+
+// Haalt (indien aanwezig) een kleur/afwerking-fragment uit vrije tekst: eerst het stuk na de laatste
+// komma (typisch voor PAB-omschrijvingen), anders het eerste zinsdeel dat kleursignaalwoorden bevat.
+// Verzint nooit een kleur - vindt hij niks herkenbaars, dan blijft het resultaat leeg.
+// Kleurwaarde netjes naar Titlecase i.p.v. ALL CAPS uit de brontekst. Woorden met een punt erin
+// (afkortingen zoals 'HGL.lac') blijven ongemoeid; slash-gescheiden woorden (zoals 'White/White')
+// worden allebei apart Titlecase gemaakt.
+function titlecaseKleur(s){
+  return norm(s).split(' ').map(wd => {
+    if(wd.includes('.')) return wd; // afkortingen zoals HGL.lac ongemoeid laten
+    if(wd.includes('/')) return wd.split('/').map(p => p ? p.charAt(0).toUpperCase()+p.slice(1).toLowerCase() : p).join('/');
+    return wd ? wd.charAt(0).toUpperCase()+wd.slice(1).toLowerCase() : wd;
+  }).join(' ');
+}
+
+function kleurUitVrijeTekst(tekst){
+  const t = norm(tekst);
+  const komma = t.lastIndexOf(',');
+  if(komma > -1){
+    const staart = t.slice(komma+1).trim();
+    if(staart && staart.length <= 40 && !/\d/.test(staart) && KLEUR_SIGNAL.test(staart)) return staart;
+  }
+  // Geen komma: verzamel alle unieke kleur-gerelateerde woorden uit de tekst (ongeacht positie),
+  // net als in splitsOmschrijving - voorkomt duplicaten en 'alles tot het einde'-overmatching.
+  const gezien = new Set();
+  const woorden = t.split(/[\s,]+/).filter(w => {
+    if(!w || !KLEUR_SIGNAL.test(w) || /\d/.test(w)) return false;
+    const key = w.toLowerCase();
+    if(gezien.has(key)) return false;
+    gezien.add(key);
+    return true;
+  });
+  if(woorden.length){
+    const frase = woorden.join(' ');
+    if(frase.length <= 40) return frase;
+  }
+  return '';
+}
+
+function splitsOmschrijving(oms, merk, serie){
+  let tekst = norm(oms).replace(/×/g,'x');
+  const merkU = norm(merk);
+  const serieU = norm(serie).split(':').pop();
+  if(serieU) tekst = tekst.replace(new RegExp('\\b'+serieU.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','ig'), '').trim();
+  if(merkU) tekst = tekst.replace(new RegExp('\\b'+merkU.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','ig'), '').trim();
+  // Merk+serie kunnen ook aan elkaar geplakt in de brontekst staan (bijv. 'BetteForm' terwijl serie
+  // los 'Form' heet) — een losse woordgrens-check mist dat omdat er geen spatie tussenin zit.
+  if(merkU && serieU){
+    const plak = (merkU+serieU).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    tekst = tekst.replace(new RegExp('\\b'+plak+'\\b','ig'), '').trim();
+  }
+
+  // Kleur: PAB-omschrijvingen van dit type eindigen doorgaans op ", <kleur/afwerking>" — dat segment
+  // wordt woordelijk overgenomen in Omschrijving Kleur, nooit herschreven of verzonnen.
+  let kleur = '', kleurOnzeker = false;
+  const komma = tekst.lastIndexOf(',');
+  if(komma > -1){
+    const staart = tekst.slice(komma+1).trim();
+    if(staart && staart.length <= 40 && !/\d/.test(staart) && KLEUR_SIGNAL.test(staart)){
+      kleur = staart;
+      kleurOnzeker = !KLEUR_ABBR.some(([re]) => re.test(staart));
+      tekst = tekst.slice(0, komma).trim();
+    }
+  }
+  // Sommige leveranciers (zoals Detremmerie) scheiden kleur/afwerking met ' - ' i.p.v. een komma,
+  // bijv. 'Hangkast deur R push to open - Mocca/Mocca mat lac'. Het staart-deel wordt hier betrouwbaar
+  // als kleur behandeld (ook als het een merk-eigen naam is die niet in KLEUR_SIGNAL voorkomt) — de
+  // structuur zelf (na de laatste ' - ') bepaalt dat het de kleur is, mits geen cijfers en redelijke lengte.
+  if(!kleur){
+    const streepIdx = tekst.lastIndexOf(' - ');
+    if(streepIdx > -1){
+      const staart = tekst.slice(streepIdx+3).trim();
+      if(staart && staart.length <= 40 && !/\d/.test(staart)){
+        kleur = staart;
+        kleurOnzeker = !KLEUR_ABBR.some(([re]) => re.test(staart));
+        tekst = tekst.slice(0, streepIdx).trim();
+      }
+    }
+    // Trailing kaal streepje zonder inhoud erna (bijv. '... push to open -') alsnog opruimen
+    tekst = tekst.replace(/\s*-\s*$/, '').trim();
+  }
+  // Geen kleur na komma/streepje gevonden: probeer kleur+afwerking-frase te vinden in de vrije tekst
+  // bijv. 'WC-zitting Wit Hoogglans' -> kleur='Wit Hoogglans', tekst='WC-zitting'
+  // Pakt alleen het kleurwoord + aaneengesloten volgende kleur-gerelateerde woorden, NIET alles
+  // tot het einde van de tekst (anders faalt de match zodra er na de kleur nog iets anders staat).
+  if(!kleur){
+    const woorden = tekst.split(/\s+/);
+    for(let i=0; i<woorden.length; i++){
+      if(KLEUR_SIGNAL.test(woorden[i])){
+        let eind = i+1;
+        while(eind < woorden.length && KLEUR_SIGNAL.test(woorden[eind]) && !/\d/.test(woorden[eind])) eind++;
+        const frase = woorden.slice(i, eind).join(' ');
+        if(frase.length <= 40 && !/\d/.test(woorden[i])){
+          kleur = frase;
+          kleurOnzeker = !KLEUR_ABBR.some(([re]) => re.test(frase));
+          tekst = (woorden.slice(0, i).join(' ') + ' ' + woorden.slice(eind).join(' ')).replace(/\s{2,}/g,' ').trim();
+          break;
+        }
+      }
+    }
+  }
+
+  // Upgrade: verzamel ALLE kleur-gerelateerde woorden uit de ORIGINELE tekst, ongeacht volgorde of
+  // of ze door een komma gescheiden waren (bijv. '...hoogglans, Wit' -> beide woorden horen bij
+  // elkaar, ook al kwam de gewone extractie maar tot 'Wit'). Voorkomt dat een deel van de kleur
+  // ergens anders in de omschrijving blijft hangen.
+  const origVoorStrip = norm(oms).replace(/×/g,'x');
+  const gezienKleurwoorden = new Set();
+  const alleKleurwoorden = origVoorStrip.split(/[\s,]+/).filter(w => {
+    if(!w || !KLEUR_SIGNAL.test(w) || /\d/.test(w)) return false;
+    const key = w.toLowerCase();
+    if(gezienKleurwoorden.has(key)) return false;
+    gezienKleurwoorden.add(key);
+    return true;
+  });
+  if(alleKleurwoorden.length){
+    const combi = alleKleurwoorden.join(' ');
+    if(combi.length > kleur.length){
+      kleur = combi;
+      kleurOnzeker = !KLEUR_ABBR.some(([re]) => re.test(combi));
+    }
+    // Eventuele restwoorden die nu niet meer bij de kleur horen alsnog uit tekst verwijderen
+    for(const w of alleKleurwoorden){
+      tekst = tekst.replace(new RegExp('\\b'+w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','ig'), '');
+    }
+    tekst = tekst.replace(/\s*,\s*,+/g,',').replace(/^[,\s]+|[,\s]+$/g,'').replace(/\s{2,}/g,' ').trim();
+  }
+
+  // Vangnet: kleurwaarde altijd ontdoen van overgebleven leestekens aan begin/eind
+  kleur = kleur.replace(/^[,.\s]+|[,.\s]+$/g,'').trim();
+
+  // Afmeting: getal(len) + eenheid (mm, cm, l/min, bar, m², enz.) uit de tekst lichten, nooit gokken.
+  // Pakt alleen het dimensiepatroon zelf (met of zonder spaties rond de x), NIET alles wat er verder
+  // nog in de tekst staat (dat leidde eerder tot materiaalbeschrijvingen als 'geglazuurd' of afgekapte
+  // PAB-fragmenten als 'Bade...' die ten onrechte in de afmeting terechtkwamen).
+  let afmeting = '';
+  const afmMatch = tekst.match(/\b\d[\d.,\/]*\s*[x×]\s*\d[\d.,\/]*(?:\s*[x×]\s*\d[\d.,\/]*)?\s*(mm|cm|m²)\b|\b[\d.,]+\s*(mm|cm|m²|l\/min|kg|w|v)\b/i);
+  if(afmMatch){
+    let matchEinde = afmMatch.index + afmMatch[0].length;
+    let afm = afmMatch[0].trim();
+    // Een korte, bekende aansluit-/verbindingsaanduiding vlak erna (zoals 'knel') hoort er wel bij
+    const rest = tekst.slice(matchEinde);
+    const vervolgWoord = rest.match(/^\s+(knel|lijm|draad|klem|pers)\b/i);
+    if(vervolgWoord){
+      afm += ' ' + vervolgWoord[1].toLowerCase();
+      matchEinde += vervolgWoord[0].length;
+    }
+    afmeting = afm;
+    tekst = (tekst.slice(0, afmMatch.index) + ' ' + tekst.slice(matchEinde))
+      .replace(/\s*,\s*,+/g,',').replace(/^[,\s]+|[,\s]+$/g,'').replace(/\s{2,}/g,' ').trim();
+  }
+
+  // Straalsoorten (net als Henco/buizen-op-rol) hoort in Omschrijving additioneel, niet in het nl-veld.
+  let additioneel = '';
+  const strMatch = tekst.match(/(\d+)\s*straalsoort(en)?/i);
+  if(strMatch){
+    additioneel = strMatch[1]+' straalsoort'+(strMatch[1]==='1' ? '' : 'en');
+    tekst = (tekst.slice(0, strMatch.index) + tekst.slice(strMatch.index+strMatch[0].length)).replace(/\s{2,}/g,' ').trim();
+  }
+
+  tekst = tekst.replace(/×/g, 'x');  // Bette gebruikt × (U+00D7) in plaats van x
+  tekst = tekst.replace(/,\s*\./g,'').replace(/[\s,]*\.\s*$/,'').replace(/\s*,\s*$/,'').replace(/\s{2,}/g,' ').trim();
+
+  // Materiaal-/kenmerkinfo (geglazuurd titanium-staal, antislip) is relevante technische informatie
+  // die niet als producttype mag gelden, maar wél behouden moet blijven — toevoegen aan nl (max 80
+  // tekens) of additioneel (max 50 tekens), afhankelijk van waar nog ruimte voor is.
+  const materiaalKenmerken = [];
+  if(/geglazuurd/i.test(origVoorStrip) && /titanium.?staal/i.test(origVoorStrip)){
+    materiaalKenmerken.push('Geglazuurd titanium-staal');
+  } else if(/titanium.?staal/i.test(origVoorStrip)){
+    materiaalKenmerken.push('Titanium-staal');
+  } else if(/geglazuurd/i.test(origVoorStrip)){
+    materiaalKenmerken.push('Geglazuurd');
+  }
+  if(/antislip/i.test(origVoorStrip)){
+    const klasseMatch = origVoorStrip.match(/antislip[^,]{0,20}?klasse\s*([A-Z0-9]+)/i);
+    materiaalKenmerken.push(klasseMatch ? `Antislip klasse ${klasseMatch[1]}` : 'Antislip');
+  }
+  for(const kenmerk of materiaalKenmerken){
+    const metNl = tekst ? `${tekst}, ${kenmerk}` : kenmerk;
+    if(metNl.length <= 80){
+      tekst = metNl;
+    } else if((additioneel ? additioneel+', '+kenmerk : kenmerk).length <= 50){
+      additioneel = additioneel ? additioneel+', '+kenmerk : kenmerk;
+    }
+    // Past nergens: dan blijft het kenmerk achterwege (nooit afkappen midden in een woord/kenmerk)
+  }
+
+  return { nl: tekst.slice(0,80), kleur, afmeting, additioneel: additioneel.slice(0,50), kleurOnzeker };
+}
+
+// Leest een leverancier-kleurenlijst (Excel/CSV) en herkent zelf welke kolom het artikelnummer,
+// de EAN en de omschrijving bevat - op basis van de INHOUD (net als bij de navigatiecategorieën),
+// niet op basis van vaste headernamen, want leveranciers noemen deze kolommen allemaal anders.
+function parseLeverancierlijstSpreadsheet(buf){
+  // Niet dense:true — dit bestand heeft geen !data en levert anders overal lege strings
+  const wb = XLSX.read(new Uint8Array(buf), {type:'array', cellDates:false});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  function cellVal(r0, c0){ const cell = ws[XLSX.utils.encode_cell({r:r0,c:c0})]; return cell ? cell.v : ''; }
+  const alleRijen = [];
+  for(let r0=range.s.r; r0<=range.e.r; r0++){
+    const vals = [];
+    for(let c0=range.s.c; c0<=range.e.c; c0++) vals.push(cellVal(r0,c0));
+    alleRijen.push(vals);
+  }
+  if(!alleRijen.length) return {byArtnr:{}, byEan:{}, artikelen:[], nGevonden:0};
+  const headerRij = alleRijen[0] || [];
+  const rows = alleRijen.slice(1); // headerrij overslaan bij data-extractie
+  const nCols = Math.max(...alleRijen.map(r=>r.length));
+
+  // Stap 1: eerst proberen op HEADERNAAM te herkennen (veel betrouwbaarder dan raden op inhoud).
+  function vindKolomOpHeader(patronen){
+    for(let c=0;c<nCols;c++){
+      const h = norm(headerRij[c]).toLowerCase();
+      if(h && patronen.some(p => h.includes(p))) return c;
+    }
+    return -1;
+  }
+  let artnrCol = vindKolomOpHeader(['artikelnummer','artikelnr','art. nr','art.nr','art nr','leverancierscode','artikelcode','product code','productcode','sku','itemnumber','item number','item code','article']);
+  let eanCol = vindKolomOpHeader(['ean','gtin','barcode']);
+  let omsCol = vindKolomOpHeader(['omschrijving','beschrijving','description','product name','productnaam','naam']);
+  let kleurCol = vindKolomOpHeader(['kleur','colour','color omschrijving','color description','color','afwerking','finish']);
+  let serieCol = vindKolomOpHeader(['serie','series','lijn','productlijn']);
+  let gewichtCol = vindKolomOpHeader(['gewicht','weight','kg','brutogewicht']);
+  let prijsCol = vindKolomOpHeader(['adviesprijs','prijs','price','nettopri']);
+  let lengteCol = vindKolomOpHeader(['lengte','length','diepte','depth']);
+  let breedteCol = vindKolomOpHeader(['breedte','width']);
+  let hoogteCol = vindKolomOpHeader(['hoogte','height']);
+
+  // Stap 2: voor wat niet via de header gevonden is, terugvallen op inhoud-detectie.
+  if(artnrCol===-1 || eanCol===-1 || omsCol===-1 || kleurCol===-1){
+    let artnrScore=0, eanScore=0, omsScore=0, kleurScore=0;
+    for(let c=0;c<nCols;c++){
+      let aScore=0, eScore=0, totalLen=0, n=0, kleurHits=0, kleurN=0;
+      for(const row of rows){
+        const v = norm(row[c]);
+        if(!v) continue;
+        n++;
+        if(/^\d{8,14}$/.test(v)) eScore++;
+        if(/^[A-Z0-9][A-Z0-9._\/-]{3,19}$/i.test(v) && !/^\d{8,14}$/.test(v)) aScore++;
+        totalLen += v.length;
+        if(v.length <= 40){ kleurN++; if(KLEUR_SIGNAL.test(v)) kleurHits++; }
+      }
+      const oScore = n ? totalLen/n : 0;
+      const kScore = kleurN>=3 ? kleurHits/kleurN : 0;
+      if(artnrCol===-1 && aScore>artnrScore){ artnrScore=aScore; artnrCol=c; }
+      if(eanCol===-1 && eScore>eanScore){ eanScore=eScore; eanCol=c; }
+      if(omsCol===-1 && oScore>omsScore){ omsScore=oScore; omsCol=c; }
+      if(kleurCol===-1 && kScore>kleurScore && kScore>=0.5){ kleurScore=kScore; kleurCol=c; }
+    }
+  }
+
+  // Als geen enkele kolom herkend is via header of inhoud: noodplan — eerste kolom is artikelnummer
+  if(artnrCol === -1 && eanCol === -1){
+    artnrCol = 0;
+    if(omsCol === -1) omsCol = Math.max(0, nCols-1);
+  }
+  if(typeof log === 'function'){
+    log(`Leverancierslijst-kolommen herkend: artikelnr=${artnrCol>-1?'kolom '+(artnrCol+1):'niet gevonden'}, EAN=${eanCol>-1?'kolom '+(eanCol+1):'niet gevonden'}, omschrijving=${omsCol>-1?'kolom '+(omsCol+1):'niet gevonden'}${kleurCol>-1 ? `, kleurkolom=kolom ${kleurCol+1}` : ''}.`);
+  }
+  const byArtnr = {}, byEan = {}, artikelen = [];
+  for(const row of rows){
+    const artnr = artnrCol>-1 ? norm(row[artnrCol]) : '';
+    const ean = eanCol>-1 ? norm(row[eanCol]) : '';
+    const oms = omsCol>-1 ? norm(row[omsCol]) : '';
+    if(!artnr && !ean) continue;
+    // Sla koptekst-rijen over (als de 'artnr' zelf een van de header-patronen is)
+    if(artnr && /^(art[\s.]*nr|artikelnummer|artikel|ean|omschrijving)$/i.test(artnr)) continue;
+    const serie = serieCol>-1 ? norm(row[serieCol]) : '';
+    const gew = gewichtCol>-1 ? parseFloat(row[gewichtCol]) : NaN;
+    const gewichtGr = !isNaN(gew) && gew>0 ? (gew<10 ? parseFloat((gew*1000).toFixed(0)) : parseFloat(gew.toFixed(0))) : null;
+    const prijs = prijsCol>-1 ? parseFloat(row[prijsCol]) : NaN;
+    const l = lengteCol>-1 ? parseFloat(row[lengteCol]) : NaN;
+    const b = breedteCol>-1 ? parseFloat(row[breedteCol]) : NaN;
+    const h = hoogteCol>-1 ? parseFloat(row[hoogteCol]) : NaN;
+    artikelen.push({
+      artnr, ean, oms, serie,
+      gewicht: gewichtGr, diepte: !isNaN(l)?l:null, breedte: !isNaN(b)?b:null, hoogte: !isNaN(h)?h:null,
+      prijs: !isNaN(prijs)?prijs:null
+    });
+    const kleur = (kleurCol>-1 ? norm(row[kleurCol]) : '') || kleurUitVrijeTekst(oms);
+    if(!kleur) continue;
+    if(artnr) byArtnr[artnr.toUpperCase()] = kleur;
+    if(ean) byEan[ean] = kleur;
+  }
+  return {byArtnr, byEan, artikelen, nGevonden: Object.keys(byArtnr).length + Object.keys(byEan).length};
+}
+
+// Leest een foto/screenshot van een leverancier-kleurenlijst via de Claude API (vision) en zet die om
+// naar dezelfde byArtnr/byEan-structuur. Gebruikt dezelfde API-key als de intrastat-AI-aanvulling.
+async function parseLeverancierlijstAfbeelding(buf, mimeType, apiKey){
+  const base64 = btoa(new Uint8Array(buf).reduce((s,b)=>s+String.fromCharCode(b),''));
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body: JSON.stringify({
+      model:'claude-sonnet-4-6',
+      max_tokens:2000,
+      messages:[{
+        role:'user',
+        content:[
+          {type:'image', source:{type:'base64', media_type:mimeType, data:base64}},
+          {type:'text', text:'Dit is een leverancier-productlijst. Geef ALLEEN een JSON-array terug (geen uitleg, geen markdown) met voor elke rij: {"artikelnummer":"...", "ean":"...", "omschrijving":"...", "kleur":"..."} - omschrijving is de volledige productomschrijving zoals in de lijst, kleur is specifiek het kleur/afwerking-gedeelte daarvan (bijv. "Cool Sunrise Geborsteld", "Chroom", "Supersteel"). Laat een veld leeg ("") als het niet zichtbaar is.'}
+        ]
+      }]
+    })
+  });
+  const data = await resp.json();
+  const tekst = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+  const jsonMatch = tekst.match(/\[[\s\S]*\]/);
+  if(!jsonMatch) throw new Error('Geen JSON-array in AI-antwoord gevonden.');
+  const items = JSON.parse(jsonMatch[0]);
+  const byArtnr = {}, byEan = {}, artikelen = [];
+  for(const it of items){
+    const artnr = norm(it.artikelnummer), ean = norm(it.ean), oms = norm(it.omschrijving);
+    if(artnr || ean) artikelen.push({artnr, ean, oms});
+    if(!it.kleur) continue;
+    if(artnr) byArtnr[artnr.toUpperCase()] = norm(it.kleur);
+    if(ean) byEan[ean] = norm(it.kleur);
+  }
+  return {byArtnr, byEan, artikelen, nGevonden: Object.keys(byArtnr).length + Object.keys(byEan).length};
+}
+
+function proposeO2(merk, serie, artnr){
+  const merkU = norm(merk).toUpperCase();
+  // Serie kan 'Merk:SubSerie' zijn — de merk-prefix er eerst afstropen
+  const serieRaw = norm(serie).includes(':') ? norm(serie).split(':').slice(1).join(':') : norm(serie);
+  const serieU = serieRaw.toUpperCase();
+  const serieDeel = serieU.startsWith(merkU) && merkU ? serieU : (merkU ? merkU+' '+serieU : serieU).trim();
+  let full = (serieDeel+' '+artnr).trim();
+  if(full.length<=30) return full;
+
+  const ruimte = 30 - artnr.length - 1;
+  let woorden = serieDeel.split(' ').filter(Boolean);
+  // Stap 1: merk (eerste woord) inkorten met punt, zoals 'DETREMMERIE' -> 'DETREM.'
+  if(woorden.length && woorden[0].length > 6){
+    woorden[0] = woorden[0].slice(0,6)+'.';
+  }
+  // Stap 2: als het nog steeds niet past, het langste/laatste woord net zo ver inkorten als nodig
+  // om te passen (met punt), i.p.v. altijd drastisch naar 3 tekens — zo blijft er zoveel mogelijk
+  // van het woord herkenbaar, en wordt de beschikbare ruimte binnen de 30 tekens beter benut.
+  for(let i = woorden.length-1; i>=1 && woorden.join(' ').length > ruimte; i--){
+    if(woorden[i].length <= 3) continue;
+    const andereLengte = woorden.filter((_,idx)=>idx!==i).join(' ').length + 1;
+    const beschikbaar = ruimte - andereLengte;
+    const metPunt = Math.max(Math.min(beschikbaar - 1, woorden[i].length - 1), 3);
+    if(metPunt <= 3){
+      woorden[i] = woorden[i].slice(0,3);
+    } else {
+      woorden[i] = woorden[i].slice(0, metPunt) + '.';
+    }
+  }
+  let kort = woorden.join(' ');
+  // Nog steeds te lang (zeldzaam): dan alsnog op woordgrens afkappen, artikelnummer nooit inkorten
+  if(kort.length > ruimte){
+    kort = kort.slice(0, Math.max(ruimte,3));
+    const laatsteSpatie = kort.lastIndexOf(' ');
+    if(laatsteSpatie > 2) kort = kort.slice(0, laatsteSpatie);
+  }
+  return (kort + ' ' + artnr).trim().slice(0,30);
+}
+
+async function run(){
+  const btn = document.getElementById('btn-run');
+  btn.disabled = true;
+  document.getElementById('log').textContent = '';
+  log('Bestanden inlezen...');
+
+  const wbSales = readWorkbookSJS(state.sales);
+  const wbKlas = readWorkbookSJS(state.klas);
+
+  // Leveranciersnummers-lookup: naam (hoofdlettervrij) -> nummer
+  const leveranciersNummerByNaam = {};
+  if(state.leveranciers){
+    // Lees zonder dense:true want sommige .xlsx-bestanden leveren geen !data op met die optie
+    const wbLev = XLSX.read(new Uint8Array(state.leveranciers), {type:'array', cellDates:false});
+    const wsLev = wbLev.Sheets[wbLev.SheetNames[0]];
+    const rangeL = XLSX.utils.decode_range(wsLev['!ref']);
+    // Zoek kolommen op headernaam
+    let nrCol=-1, naamCol=-1;
+    for(let c=rangeL.s.c; c<=rangeL.e.c; c++){
+      const addr = XLSX.utils.encode_cell({r:rangeL.s.r, c});
+      const h = (wsLev[addr] ? String(wsLev[addr].v) : '').toLowerCase();
+      if(h.includes('nummer') || h.includes('number') || h.includes('code')) nrCol=c;
+      if(h.includes('naam') || h.includes('name') || h.includes('omschrijving')) naamCol=c;
+    }
+    for(let r=rangeL.s.r+1; r<=rangeL.e.r; r++){
+      const nr = nrCol>=0 ? (wsLev[XLSX.utils.encode_cell({r,c:nrCol})] || {}).v : null;
+      const naam = naamCol>=0 ? (wsLev[XLSX.utils.encode_cell({r,c:naamCol})] || {}).v : null;
+      if(nr && naam) leveranciersNummerByNaam[String(naam).toUpperCase()] = String(nr);
+    }
+    log(`Leveranciersnummers: ${Object.keys(leveranciersNummerByNaam).length} geladen.`);
+  }
+  // Bevestigde merk-aliassen: submerken die via dezelfde leverancier lopen maar niet apart in het
+  // Leveranciers-naslagbestand staan (nooit zelf raden — alleen expliciet door Jarne bevestigde koppelingen).
+  const MERK_ALIAS_LEVERANCIER = { 'SCHWAB': 'WISA' };
+  for(const [alias, echt] of Object.entries(MERK_ALIAS_LEVERANCIER)){
+    if(!leveranciersNummerByNaam[alias]){
+      const match = Object.keys(leveranciersNummerByNaam).find(k => k.includes(echt));
+      if(match) leveranciersNummerByNaam[alias] = leveranciersNummerByNaam[match];
+    }
+  }
+  const wbGroep = readWorkbookSJS(state.groep);
+  const [wbT1pre, wbT2pre] = await Promise.all([readWorkbook(state.t1), readWorkbook(state.t2)]);
+  log('Naslagbestanden en sjablonen ingelezen.');
+
+  const ws1pre = wbT1pre.worksheets.find(w=>/product/i.test(w.name)) || wbT1pre.worksheets[wbT1pre.worksheets.length-1];
+  const headerMap1pre = {};
+  ws1pre.getRow(1).eachCell((cell,col)=>{ headerMap1pre[norm(cell.value)] = col; });
+  function findCol1(needle){ for(const k in headerMap1pre){ if(k.toLowerCase().includes(needle.toLowerCase())) return headerMap1pre[k]; } return null; }
+
+  let merged = [];
+  let existingRowByArtnr = {};
+  let lastExistingRow = 3;
+
+  if(state.pab){
+    log('Bron: PAB-bestand wordt uitgelezen.');
+    const wbPAB = readWorkbookSJS(state.pab);
+    const wsArt = wbPAB.Sheets['Artikelen'];
+    const wsProd = wbPAB.Sheets['Producten'];
+    const wsPr2 = wbPAB.Sheets['ArtPr2Data'];
+    if(!wsArt || !wsProd){
+      log('FOUT: tabblad "Artikelen" of "Producten" niet gevonden in het PAB-bestand. Gevonden tabbladen: '+wbPAB.SheetNames.join(', '));
+      btn.disabled = false; return;
+    }
+    let artikelen = sheetRowsSJS(wsArt, 7, 101).filter(r => norm(r['Artikelcode Leverancier \nA(20)']));
+    const producten = sheetRowsSJS(wsProd, 7, 101);
+    const artpr2 = wsPr2 ? sheetRowsNoHeaderSJS(wsPr2, 1) : [];
+    log(`Artikelen: ${artikelen.length} rijen. Producten: ${producten.length} rijen. ArtPr2Data: ${artpr2.length} rijen.`);
+
+    let artnrsInput = norm(document.getElementById('f-artnrs').value);
+    if(!artnrsInput && state.t1HasData){
+      const colArtBestaand = findCol1('Artikelnummer Leverancier');
+      if(colArtBestaand){
+        const bestaandeArtnrs = [];
+        for(let r=4; r<=ws1pre.rowCount; r++){
+          const v = norm(ws1pre.getRow(r).getCell(colArtBestaand).value);
+          if(v) bestaandeArtnrs.push(v);
+        }
+        if(bestaandeArtnrs.length){
+          artnrsInput = bestaandeArtnrs.join(',');
+          log(`Geen filter opgegeven, maar Workflow deel 1 bevat al ${bestaandeArtnrs.length} artikel(en) — deze worden automatisch als filter gebruikt.`);
+        }
+      }
+    }
+    if(artnrsInput){
+      const gevraagd = artnrsInput.split(/[\n,;\s]+/).map(s=>norm(s)).filter(Boolean);
+      const gevraagdSet = new Set(gevraagd.map(s=>s.toUpperCase()));
+      const gevonden = new Set();
+      artikelen = artikelen.filter(r=>{
+        const artnr = norm(r['Artikelcode Leverancier \nA(20)']).toUpperCase();
+        const ean = norm(r['GTIN/EAN\nfysiek product \nN(14)']).toUpperCase();
+        const eanArt = norm(r['GTIN/EAN artikel \nleverancier  \nN(14)']).toUpperCase();
+        const match = gevraagdSet.has(artnr) || gevraagdSet.has(ean) || gevraagdSet.has(eanArt);
+        if(match){ gevonden.add(artnr); gevonden.add(ean); gevonden.add(eanArt); }
+        return match;
+      });
+      const nietGevonden = gevraagd.filter(g => !gevonden.has(g.toUpperCase()));
+      log(`Filter toegepast: ${gevraagd.length} opgegeven, ${artikelen.length} gevonden in PAB.`);
+      if(nietGevonden.length) log(`Niet gevonden in PAB: ${nietGevonden.join(', ')}`);
+    }
+
+    if(artikelen.length === 0){
+      log('FOUT: 0 artikelen over na filtering. Controleer of het PAB-bestand en de opgegeven artikelnummers/EAN\'s bij elkaar horen (bijv. verkeerde leverancier, of oude artikelnummers uit een vorige test in het filterveld).');
+      btn.disabled = false; return;
+    }
+
+    const productenByGtin = {};
+    for(const p of producten){
+      const gtin = norm(p['GTIN/EAN\nfysiek product \nN(14)']);
+      if(gtin) productenByGtin[gtin] = p;
+    }
+    const prijsByArtnr = {};
+    for(const row of artpr2){
+      const artnr = norm(row[1]);
+      if(artnr) prijsByArtnr[artnr] = { prijs: row[4], eenheid: row[7], valuta: row[8] };
+    }
+
+    // Extra rijke omschrijving/trefwoorden-veld proberen te lezen (bevat vaak meer context dan de
+    // standaard Productomschrijving, zoals 'Rechthoekige baden', 'Eenpersoon bad', 'Inbouwbad').
+    // De exacte 2BA-veldnaam hiervoor is niet met zekerheid bekend, dus meerdere kandidaten proberen.
+    const TREFWOORDEN_KANDIDATEN = [
+      'Trefwoorden', 'Zoektermen', 'Zoekwoorden', 'Kenmerken', 'Toepassingsgebied',
+      'Aanvullende productinformatie', 'Aanvullende product informatie', 'Uitgebreide omschrijving',
+      'Classificatie kenmerken', 'Product kenmerken'
+    ];
+    let trefwoordenVeldnaam = null;
+    if(producten.length){
+      const beschikbareVelden = Object.keys(producten[0]);
+      trefwoordenVeldnaam = beschikbareVelden.find(v => TREFWOORDEN_KANDIDATEN.some(k => v.toLowerCase().includes(k.toLowerCase())));
+      if(trefwoordenVeldnaam) log(`Extra trefwoorden-veld gevonden in PAB: "${trefwoordenVeldnaam.replace(/\n/g,' ')}".`);
+    }
+
+    merged = artikelen.map(a=>{
+      const artnr = norm(a['Artikelcode Leverancier \nA(20)']);
+      const gtin = norm(a['GTIN/EAN\nfysiek product \nN(14)']);
+      const p = productenByGtin[gtin] || {};
+      const prijs = prijsByArtnr[artnr] || {};
+      return {
+        artnr, ean: gtin || norm(a['GTIN/EAN artikel \nleverancier  \nN(14)']),
+        merk: titleCase(norm(p['Fabrikaat / Merk \nA(35)'])), serie: norm(p['Product-serie \nA(35)']),
+        etim: norm(p['Code productgroep (EC code)']), oms: norm(p['Productomschrijving \nA(70)']),
+        trefwoorden: trefwoordenVeldnaam ? norm(p[trefwoordenVeldnaam]) : '',
+        gewicht: p['Netto gewicht N(15,3)'] || a['Bruto-gewicht N(15,3)'],
+        gewichtEh: norm(p['Gewichts eenheid A(3)']) || norm(a['Eenheid gewicht A(3)']),
+        prijs: prijs.prijs ?? null, valuta: norm(prijs.valuta),
+        intrastatEigen: norm(a['CBS-nummer A(17)']),
+        verpH: a['Hoogte verpakking N(15,3)'], verpL: a['Lengte verpakking N(15,3)'],
+        verpB: a['Breedte verpakking N(15,3)'], verpEh: norm(a['Eenheid afmeting verpakking A(3)']),
+        levertijd: a['Levertijd N(15)'], levertijdEh: norm(a['Levertijd-eenheid A(6)'])
+      };
+    });
+
+    const wsSyn = wbPAB.Sheets['ETIM SYNONIEMEN'];
+    if(wsSyn){
+      const synRows = sheetRowsSJS(wsSyn, 1, 2);
+      const ubimToEc = {};
+      for(const row of synRows){
+        const ubim = norm(row['UBIM']);
+        const ec = norm(row['EC.CODE']);
+        if(ubim && ec && !ubimToEc[ubim]) ubimToEc[ubim] = ec;
+      }
+      let nVertaald = 0;
+      for(const m of merged){
+        if(m.etim && !/^EC/i.test(m.etim) && ubimToEc[m.etim]){
+          m.etim = ubimToEc[m.etim];
+          nVertaald++;
+        }
+      }
+      log(`ETIM SYNONIEMEN: ${synRows.length} rijen. ${nVertaald} oude UBIM-codes vertaald naar EC-codes.`);
+    }
+
+    for(let r=4; r<=ws1pre.rowCount; r++){
+      const row = ws1pre.getRow(r);
+      let has=false; row.eachCell({includeEmpty:false}, c=>{ if(norm(c.value)!=='') has=true; });
+      if(has){
+        lastExistingRow = r;
+        const a = findCol1('Artikelnummer Leverancier');
+        if(a){ const v = norm(row.getCell(a).value); if(v) existingRowByArtnr[v.toUpperCase()] = r; }
+      }
+    }
+    log(`Gekoppeld vanuit PAB: ${merged.length} artikelen.`);
+  } else {
+    log('Bron: bestaande data in Workflow deel 1 wordt aangevuld.');
+    const colArt = findCol1('Artikelnummer Leverancier');
+    const colEan = findCol1('EAN');
+    const colMerk = findCol1('Merk');
+    const colSerie = findCol1('Serie');
+    const colClass = findCol1('Classificatie Categorieën');
+    const colSug1 = findCol1('Suggestie omschrijving 1');
+    const colOmsNl = findCol1('Omschrijving artikel[nl]');
+    for(let r=4; r<=ws1pre.rowCount; r++){
+      const row = ws1pre.getRow(r);
+      const artnr = colArt ? norm(row.getCell(colArt).value) : '';
+      if(!artnr) continue;
+      lastExistingRow = r;
+      existingRowByArtnr[artnr.toUpperCase()] = r;
+      const classVal = colClass ? norm(row.getCell(colClass).value) : '';
+      const etim = classVal.split(':')[0] || '';
+      const colKleur = findCol1('Omschrijving Kleur');
+      const oms = (colSug1 ? norm(row.getCell(colSug1).value) : '') || (colOmsNl ? norm(row.getCell(colOmsNl).value) : '');
+      const bestaandeKleurWaarde = colKleur ? norm(row.getCell(colKleur).value) : '';
+      merged.push({
+        artnr, ean: colEan ? norm(row.getCell(colEan).value) : '',
+        merk: colMerk ? norm(row.getCell(colMerk).value) : '',
+        serie: colSerie ? norm(row.getCell(colSerie).value).split(':').pop() : '',
+        etim, oms, kleur: bestaandeKleurWaarde, gewicht: null, gewichtEh: '', prijs: null, valuta: '', fromExisting:true
+      });
+    }
+    log(`Gevonden in Workflow deel 1: ${merged.length} artikelen zonder volledige codering.`);
+    if(merged.length===0 && state.leverancierlijstLookup && state.leverancierlijstLookup.artikelen && state.leverancierlijstLookup.artikelen.length){
+      log('Workflow deel 1 is leeg — leverancierslijst wordt als bron gebruikt (artikelen niet gekoppeld aan 2BA/PAB).');
+
+      // Bepaal het merk op basis van het opgeslagen bestand (of uit het leveranciersnummer-bestand)
+      // Door te kijken welke leveranciersnaam het hoogste percentage matches geeft op serienamen.
+      const seriesInBestand = state.leverancierlijstLookup.artikelen.map(a=>norm(a.serie)).filter(Boolean);
+      let merkVanBestand = '';
+      for(const [naam, nr] of Object.entries(leveranciersNummerByNaam)){
+        const woorden = naam.split(/\s+/);
+        if(seriesInBestand.some(s => woorden.some(w => w.length>3 && s.toUpperCase().includes(w)))){
+          merkVanBestand = naam.split(/\s+/)[0].replace(/[^A-Z]/gi,'');
+          merkVanBestand = merkVanBestand.charAt(0)+merkVanBestand.slice(1).toLowerCase();
+          break;
+        }
+      }
+      // Als de serie al met een merknaam begint, gebruik die
+      for(const art of state.leverancierlijstLookup.artikelen){
+        const s = norm(art.serie);
+        if(!merkVanBestand && s){
+          const eersteWoord = s.split(' ')[0];
+          if(leveranciersNummerByNaam[eersteWoord.toUpperCase()]) merkVanBestand = eersteWoord;
+        }
+      }
+      // Puur op merknaam 'Grohe' terugvallen als bekende serie-prefix "Vitalio" gevonden
+      if(!merkVanBestand && seriesInBestand.some(s=>/vitalio|grohe|rapido|euphoria|grohtherm/i.test(s))){
+        merkVanBestand = 'Grohe';
+      }
+      const levNrVanBestand = merkVanBestand ? leveranciersNummerByNaam[merkVanBestand.toUpperCase()] || '' : '';
+      if(merkVanBestand) log(`Merk herkend uit leverancierslijst: ${merkVanBestand} (leveranciersnr: ${levNrVanBestand||'onbekend'})`);
+
+      for(const art of state.leverancierlijstLookup.artikelen){
+        if(!art.artnr && !art.ean) continue;
+        const artnr = art.artnr || art.ean;
+        const merk = merkVanBestand || '';
+
+        let omsSchoon = norm(art.oms);
+        const serieNormaal = norm(art.serie);
+        const serieRegex = serieNormaal.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/\s+/g,'[\\s\\-]?');
+        if(serieNormaal) omsSchoon = omsSchoon.replace(new RegExp(serieRegex,'ig'), '');
+        const serieZonderSpaties = serieNormaal.replace(/\s+/g,'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+        if(serieZonderSpaties.length>4) omsSchoon = omsSchoon.replace(new RegExp(serieZonderSpaties,'ig'), '');
+        if(merk) omsSchoon = omsSchoon.replace(new RegExp('\\b'+merk.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','ig'), '');
+        omsSchoon = omsSchoon.replace(/\bVitalio\w*\s*(Silver|Plus|Pro|Comfort|Start|Universal)?\b/gi, '');
+        omsSchoon = omsSchoon.replace(/(\d+)\s*[Mm]{2}/g, '$1 mm');
+        omsSchoon = omsSchoon.replace(/,?\s*[\d.,]+(?:,\d+)?\s*L\/[Mm](?:in)?[^,]*/gi, '');
+        // Resterende losse leestekens opruimen na het weghalen van specs en kleur
+        omsSchoon = omsSchoon.replace(/[\s,]*\.\s*$/, '');  // losse punt aan het eind
+        omsSchoon = omsSchoon.replace(/,\s*\./g, '');       // komma-punt combinatie
+        omsSchoon = omsSchoon.replace(/\s*,\s*,+/g, ',');   // dubbele komma's
+        omsSchoon = omsSchoon.replace(/^[\s,.]+|[\s,.]+$/g,'').replace(/\s{2,}/g,' ').trim();
+        omsSchoon = omsSchoon.replace(/\s{2,}/g,' ').replace(/^[\s,]+|[\s,]+$/g,'').trim();
+        // Maatcijfer dat VOOR het producttype staat -> achter plaatsen ('280 Hoofddouche' -> 'Hoofddouche 280')
+        // Heel woord meenemen zodat 'Hoofddouche' intact blijft (niet alleen eerste letter)
+        omsSchoon = omsSchoon.replace(/^(\d[\d×x]*(?:[×x]\d+)?)\s+([A-Za-z][A-Za-z\-+]*)/, '$2 $1').replace(/\s{2,}/g,' ').trim();
+        // Drukspecificatie 'Bij 3 Bar', '3 Bar' e.d. weghalen (geen afmeting)
+        omsSchoon = omsSchoon.replace(/,?\s*(Bij\s+)?[\d.,]+\s*Bar\b/gi, '').replace(/\s{2,}/g,' ').replace(/^[\s,]+|[\s,]+$/g,'').trim();
+        // 'Max.' weghalen
+        omsSchoon = omsSchoon.replace(/\bMax\.?\b/gi,'').replace(/\s{2,}/g,' ').trim();
+
+        // ETIM/navigatie/intrastat raden op basis van productnaam (vetgedrukt = onzeker)
+        const ETIM_TABEL_LEV = [
+          [/doucheslang/i,    'EC011535', 'Doucheslang',     '01.05.04.05:Doucheslangen:Staged:pliegerProductCatalog', '39173200'],
+          [/hoofddoucheset|doucheset/i,'EC010109','Glijstangcombinatie','01.05.04.04:Glijstangcombinatie:Staged:pliegerProductCatalog','84818039'],
+          [/hoofddouche/i,    'EC010161', 'Handdouche',      '01.05.04.01:Handdouches:Staged:pliegerProductCatalog','84818039'],
+          [/handdouche/i,     'EC010161', 'Handdouche',      '01.05.04.01:Handdouches:Staged:pliegerProductCatalog','84818039'],
+          [/glijstang/i,      'EC010140', 'Glijstang',       '01.05.04.03:Glijstangen:Staged:pliegerProductCatalog','84818039'],
+          [/douchemengkraan|douchekraan/i,'EC011329','Douchemengkraan','01.06.04:Douchekranen:Staged:pliegerProductCatalog','84818039'],
+          [/badmengkraan|badkraan/i,'EC010862','Badmengkraan','01.06.01:Badkranen:Staged:pliegerProductCatalog','84818039'],
+          [/geluidsisolatieset/i,'EC010849','Geluidsisolatieset opvangtoestellen','01.03.03:Toebehoren voor baden:Staged:pliegerProductCatalog','39229000'],
+          [/beluchter/i,      'EC010131', 'Beluchter',       '02.02.06:Beluchters:Staged:pliegerProductCatalog','39174000'],
+          [/muurplaat|verloopset|verl\.?\s*set|knelkoppeling|fitting/i,'EC003024','Fitting met 2 aansluitingen','02.06.05:Persfittingen:Staged:pliegerProductCatalog','39229000'],
+          [/onderdel|membraan|steunplaat|stelpennen|montage.?set/i,'EC011339','Toebehoren/onderdelen voor spoelreservoir','01.10.06:Toebehoren voor inbouwreservoirs:Staged:pliegerProductCatalog','39229000'],
+          [/badkuip|ligbad|\bbad\b|bade[wnr]/i,'EC011609','Bad','01.03.01:Baden:Staged:pliegerProductCatalog','39221000'],
+          [/douchebak/i,      'EC011443', 'Douchebak',       '01.05.02:Douchebakken:Staged:pliegerProductCatalog','39221000'],
+          // Geverifieerde codes uit de memory — nooit opnieuw afleiden, letterlijk overnemen
+          [/brandmanchet/i,   'EC011553', 'Brandmanchet voor buis', '02.12.04:Brandmanchetten:Staged:pliegerProductCatalog','68061000'],
+          [/zelfklevende\s*tape|duct\s*tape|weefsel\s*tape/i,'EC000128','Zelfklevende tape','02.11.05:Tape:Staged:pliegerProductCatalog','39199080'],
+          [/aluminium\s*tape/i,'EC000128','Zelfklevende tape','02.11.05:Tape:Staged:pliegerProductCatalog','76129090'],
+          [/kabelbinder/i,    'EC000046', 'Kabelbinder',     '02.03.19:Kabelbinders:Staged:pliegerProductCatalog','39269097'],
+          [/reciprozaagblad/i,'EC002239', 'Reciprozaagblad', '02.07.01:Handgereedschap:Staged:pliegerProductCatalog','82023900'],
+          [/plamuurmes|spatel/i,'EC000152','Plamuurmes/spatel','02.10:Handgereedschap:Staged:pliegerProductCatalog','82054000'],
+          [/\brasp\b/i,       'EC000806', 'Rasp',            '02.07.01:Handgereedschap:Staged:pliegerProductCatalog','82055100'],
+          [/veiligheidshandschoen/i,'EC002099','Veiligheidshandschoen','02.11.03:Handschoenen:Staged:pliegerProductCatalog','40159500'],
+          [/combinatietang/i, 'EC000836', 'Combinatietang',  '02.07.01:Handgereedschap:Staged:pliegerProductCatalog','82037000'],
+          [/afteken.*meetgereedschap|meetgereedschap/i,'EC003009','Toebehoren afteken-/meetgereedschap','02.07.01:Handgereedschap:Staged:pliegerProductCatalog','90178000'],
+          [/vuilwaterdompelpomp/i,'EC010733','Vuilwaterdompelpomp','03.07.04:Dompelpompen:Staged:pliegerProductCatalog','84137030'],
+          [/condenswaterpomp/i,'EC011712','Condenswaterpomp','03.07.03:Condenswaterpompen:Staged:pliegerProductCatalog','84137030'],
+          [/kabelbuisklem/i,  'EC000368', 'Kabelbuisklem',   '02.03.07:Buisklemmen:Staged:pliegerProductCatalog','73269098'],
+          [/schroefbevestigingsset/i,'EC011733','Schroefbevestigingsset','02.03.06:Bevestigingssets:Staged:pliegerProductCatalog','39229000'],
+          [/spoelreservoirvlotterkraan|vlotterkraan/i,'EC010142','Spoelreservoirvlotterkraan','01.10.06:Toebehoren voor inbouwreservoirs:Staged:pliegerProductCatalog','84818019'],
+        ];
+        let etimGok='', navGok='', intrastatGok=null;
+        for(const [re,ec,oms_etim,nav,cn] of ETIM_TABEL_LEV){
+          if(re.test(omsSchoon)){ etimGok=ec+':'+oms_etim+':DYNAMIC:ETIM'; navGok=nav; intrastatGok=cn; break; }
+        }
+
+        const serieRaw = norm(art.serie);
+        const serie = serieRaw ? (serieRaw.toUpperCase().startsWith(merk.toUpperCase()+':') ? serieRaw : (merk ? merk+':'+serieRaw : serieRaw)) : '';
+        merged.push({
+          artnr, ean: art.ean || '',
+          merk, serie, etim: etimGok, nav: navGok, oms: omsSchoon,
+          leverancierCode: levNrVanBestand, fabrikantNaam: merk,
+          etimGok: !!etimGok, intrastatEigen: '', intrastatGok,
+          gewicht: art.gewicht != null ? art.gewicht : null,
+          gewichtEh: art.gewicht != null ? 'GRM' : '',
+          verpL: art.diepte, verpB: art.breedte, verpH: art.hoogte, verpEh: 'MMT',
+          prijs: art.prijs ?? null, valuta: 'EUR',
+          fromExisting:false
+        });
+      }
+      log(`Uit leverancierslijst: ${merged.length} artikelen.`);
+    }
+    if(merged.length===0){
+      log('FOUT: geen artikelen met een Artikelnummer Leverancier gevonden in Workflow deel 1, geen PAB-bestand, en geen (bruikbare) leverancierslijst aangeleverd.');
+      btn.disabled = false; return;
+    }
+  }
+
+  const salesSheet = wbSales.Sheets[wbSales.SheetNames[0]];
+  const salesRows = sheetRowsSJS(salesSheet, 1, 2);
+  const geldige = new Set(sheetRowsSJS(wbGroep.Sheets[wbGroep.SheetNames[0]], 1, 2).map(r=>norm(r['Sls Cd2'])).filter(Boolean));
+  // LET OP: dit naslagbestand heeft kolom I én kolom K allebei letterlijk als header 'PIM' staan
+  // Kolomposities I/K aannemen bleek onvoldoende robuust (werkt niet als het bestand toch iets
+  // anders is opgebouwd dan verwacht). Kolommen nu automatisch herkennen op basis van de INHOUD:
+  // de ETIM-kolom herken je aan 'ECxxxxxx', de navigatie-kolom aan ':Staged:pliegerProductCatalog'.
+  const klasRowsRaw = sheetRowsNoHeaderSJS(wbKlas.Sheets[wbKlas.SheetNames[0]], 2);
+  let etimColIdx = -1, navColIdx = -1;
+  if(klasRowsRaw.length){
+    const steekproef = klasRowsRaw.slice(0, Math.min(500, klasRowsRaw.length));
+    const nCols = Math.max(...steekproef.map(r=>r.length));
+    let besteEtimScore = 0, besteNavScore = 0;
+    for(let c=0; c<nCols; c++){
+      let etimScore=0, navScore=0;
+      for(const row of steekproef){
+        const v = norm(row[c]);
+        if(/^EC\d{6}/.test(v)) etimScore++;
+        if(/:Staged:pliegerProductCatalog/i.test(v)) navScore++;
+      }
+      if(etimScore > besteEtimScore){ besteEtimScore = etimScore; etimColIdx = c; }
+      if(navScore > besteNavScore){ besteNavScore = navScore; navColIdx = c; }
+    }
+    log(`Classificatiebestand: ETIM-kolom automatisch herkend op positie ${etimColIdx+1} (${besteEtimScore} treffers), navigatie-kolom op positie ${navColIdx+1} (${besteNavScore} treffers).`);
+  }
+  if(etimColIdx===-1) etimColIdx = 8;   // terugval op kolom I
+  if(navColIdx===-1) navColIdx = 10;    // terugval op kolom K
+  const navByEtim = {};
+  const navCount = {};
+  const etimOmschrijvingCount = {};
+  for(const rowArr of klasRowsRaw){
+    const etimFull = norm(rowArr[etimColIdx]);
+    const etim = etimFull.split(':')[0];
+    const etimOms = etimFull.split(':')[1] || '';
+    const nav = norm(rowArr[navColIdx]);
+    if(!etim) continue;
+    navCount[etim] = navCount[etim] || {};
+    navCount[etim][nav] = (navCount[etim][nav]||0)+1;
+    if(etimOms){
+      etimOmschrijvingCount[etim] = etimOmschrijvingCount[etim] || {};
+      etimOmschrijvingCount[etim][etimOms] = (etimOmschrijvingCount[etim][etimOms]||0)+1;
+    }
+  }
+  const etimOmschrijvingByCode = {};
+  for(const etim in etimOmschrijvingCount){
+    let best=null, bestN=-1;
+    for(const oms in etimOmschrijvingCount[etim]){ if(etimOmschrijvingCount[etim][oms]>bestN){ best=oms; bestN=etimOmschrijvingCount[etim][oms]; } }
+    etimOmschrijvingByCode[etim] = best;
+  }
+  for(const etim in navCount){
+    let best=null, bestN=-1;
+    for(const nav in navCount[etim]){ if(navCount[etim][nav]>bestN && nav){ best=nav; bestN=navCount[etim][nav]; } }
+    navByEtim[etim] = best;
+  }
+  log(`Salescodes: ${salesRows.length} rijen. Classificatie: ${klasRowsRaw.length} rijen (${Object.keys(navByEtim).length} unieke ETIM).`);
+  const voorbeeldEtims = Object.keys(navByEtim).slice(0,5);
+  log(`Voorbeeld-ETIM-codes uit classificatiebestand: ${voorbeeldEtims.join(', ') || '(geen gevonden!)'}`);
+
+  log('Salescodes indexeren per merk...');
+  const salesByArtnrPerMerk = {};
+  const salesByEanPerMerk = {};
+  const salescodeModusPerMerk = {};
+  const leverancierCodePerMerk = {};
+  const fabrikantNaamPerMerk = {};
+  function getMerkIndex(merkU){
+    if(salesByArtnrPerMerk[merkU]) return;
+    const esc = merkU.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const merkRegex = merkU ? new RegExp('^'+esc+'(\\s|$)') : null;
+    const byArt = {}, byEan = {};
+    const codeCount = {};
+    if(merkRegex){
+      for(let i=0;i<salesRows.length;i++){
+        const r = salesRows[i];
+        const pl = norm(r['Pliegernummer']).toUpperCase();
+        if(/^[9X]/.test(pl)) continue;
+        if(!merkRegex.test(norm(r['Leverancier']).toUpperCase())) continue;
+        const artnr = norm(r['Artikelnummer']);
+        const ean = norm(r['EAN']);
+        if(artnr && !byArt[artnr]) byArt[artnr] = r;
+        if(ean && !byEan[ean]) byEan[ean] = r;
+        const code = norm(r['Sls Cd2']);
+        if(code) codeCount[code] = (codeCount[code]||0)+1;
+        if(!leverancierCodePerMerk[merkU] && norm(r['Supplier Number'])) leverancierCodePerMerk[merkU] = norm(r['Supplier Number']);
+        if(!fabrikantNaamPerMerk[merkU] && norm(r['Leverancier'])) fabrikantNaamPerMerk[merkU] = norm(r['Leverancier']);
+      }
+    }
+    let modus=null, modusN=-1;
+    for(const code in codeCount){ if(codeCount[code]>modusN){ modus=code; modusN=codeCount[code]; } }
+    salescodeModusPerMerk[merkU] = modus;
+    salesByArtnrPerMerk[merkU] = byArt;
+    salesByEanPerMerk[merkU] = byEan;
+  }
+  const uniekeMerken = [...new Set(merged.map(m=>m.merk.toUpperCase()).filter(Boolean))];
+  for(const merkU of uniekeMerken) getMerkIndex(merkU);
+  log(`${uniekeMerken.length} unieke merk(en) geïndexeerd: ${uniekeMerken.join(', ')}`);
+
+  let nGeenSalescode = 0, nGeenNav = 0;
+  const BEPROEFDE_PATRONEN = {
+    '84818011': 'mengkraan',
+    '84818031': 'thermostat.*kraan|thermostaatkraan',
+    '84818039': 'kraan|kranen|afsluiter|klep|handdouche|hoofddouche|douchesysteem|douchekop|douchegarnituur',
+    '84818081': 'kogelafsluiter|plugkraan',
+    '84818085': 'vlinderklep',
+    '39222000': 'wc-zitting|closetbril|wc-deksel',
+    '69101000': 'porselein',
+    '69109000': 'wastafel|wasbak',
+    '39221000': 'badkuip|douchebak|bidet',
+    '85161011': 'geiser',
+    '73221900': 'radiator',
+    '74182000': 'toiletartikel|koper.*sanitair'
+  };
+  const GENERIEKE_OMS = new Set(['andere','delen','andere (1)','delen (1)']);
+  // Specifieke codes altijd vóór generieke laten controleren
+  const PRIORITEIT = {'84818031':0, '84818011':1, '84818081':2, '84818085':3, '84818039':4};
+
+  let cnTabelCustom = null;
+  if(state.cnParsed && state.cnParsed.length){
+    const entries = state.cnParsed.map(([code, oms])=>{
+      const schoon = oms.toLowerCase().trim();
+      if(BEPROEFDE_PATRONEN[code]) return [new RegExp(BEPROEFDE_PATRONEN[code],'i'), code, PRIORITEIT[code] ?? 5];
+      if(GENERIEKE_OMS.has(schoon) || schoon.length < 4) return null;
+      const woord = schoon.split(/[,(]/)[0].trim();
+      return woord.length > 3 ? [new RegExp(woord.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i'), code, 5] : null;
+    }).filter(Boolean);
+    entries.sort((a,b)=>a[2]-b[2]);
+    cnTabelCustom = entries.map(([re,code])=>[re,code]);
+    log(`Goederencodes uit PDF: ${cnTabelCustom.length} bruikbare codes (van ${state.cnParsed.length} gevonden regels).`);
+  } else if(state.cn){
+    try{
+      const wbCN = readWorkbookSJS(state.cn);
+      const wsCN = wbCN.Sheets[wbCN.SheetNames[0]];
+      const cnRows = sheetRowsSJS(wsCN, 1, 2);
+      cnTabelCustom = cnRows.map(r=>[
+        norm(r['Zoekwoord (regex)']),
+        norm(r['Goederencode']).replace(/\D/g,'')
+      ]).filter(([zoekwoord,code])=>zoekwoord && code)
+        .map(([zoekwoord,code])=>[new RegExp(zoekwoord, 'i'), code]);
+      log(`Goederencodes-naslagbestand: ${cnTabelCustom.length} regels ingelezen.`);
+    }catch(e){
+      log(`Kon goederencodes-bestand niet inlezen: ${e.message}. Ingebouwde standaardtabel wordt gebruikt.`);
+    }
+  }
+
+  const results = merged.map(m=>{
+    const merkU = m.merk.toUpperCase();
+    const match = (salesByArtnrPerMerk[merkU] && salesByArtnrPerMerk[merkU][m.artnr])
+      || (salesByEanPerMerk[merkU] && salesByEanPerMerk[merkU][m.ean]) || null;
+    let salescode = match ? norm(match['Sls Cd2']) : '';
+    let salescodeOnzeker = false;
+    if(!salescode && salescodeModusPerMerk[merkU]){
+      salescode = salescodeModusPerMerk[merkU];
+      salescodeOnzeker = true;
+    }
+    const salescodeGeldig = salescode ? geldige.has(salescode) : false;
+    if(!salescode) nGeenSalescode++;
+    const etimCode = m.etim.split(':')[0];
+    const nav = navByEtim[etimCode] || m.nav || '';
+    if(!nav && nGeenNav < 5) log(`  Geen navigatiecategorie voor "${etimCode}" (artikel ${m.artnr}) — komt niet voor in ${Object.keys(navByEtim).length} bekende ETIM-codes.`);
+    if(!nav) nGeenNav++;
+
+    const etimOms = etimOmschrijvingByCode[etimCode] || '';
+    const cnGok = guessCNCode(m.oms, etimOms, cnTabelCustom);
+
+    // Gewicht naar gram — 2BA geeft het gewicht in KGM of GRM; als de eenheid leeg is nemen we
+    // aan dat het KGM is als de waarde < 10 (want leveranciers geven kleine gewichten doorgaans in KG),
+    // en GRM als de waarde >= 10 (voor artikelen die al in grammen worden opgegeven).
+    let gewicht_gr = null;
+    const gew = parseFloat(m.gewicht);
+    if(!isNaN(gew) && gew > 0){
+      const eh = norm(m.gewichtEh).toUpperCase();
+      if(eh === 'KGM'){
+        gewicht_gr = parseFloat((gew * 1000).toFixed(0));
+      } else if(eh === 'GRM' || eh === 'GR'){
+        gewicht_gr = parseFloat(gew.toFixed(3));
+      } else if(gew < 10){
+        gewicht_gr = parseFloat((gew * 1000).toFixed(0));
+      } else {
+        gewicht_gr = parseFloat(gew.toFixed(3));
+      }
+    }
+
+    // Verpakkingsafmetingen naar mm
+    function naarMM(val, eh){
+      const v = parseFloat(val);
+      if(isNaN(v)) return null;
+      if(eh==='MTR') return parseFloat((v*1000).toFixed(0));
+      if(eh==='CMT' || eh==='CM') return parseFloat((v*10).toFixed(1));
+      return parseFloat(v.toFixed(1));
+    }
+    const diepte_mm = naarMM(m.verpL, m.verpEh);
+    const hoogte_mm = naarMM(m.verpH, m.verpEh);
+    const breedte_mm = naarMM(m.verpB, m.verpEh);
+
+    // Levertijd naar dagen, afgerond op hele weken (7,14,21,28...)
+    let levertijd_dagen = null;
+    const lev = parseFloat(m.levertijd);
+    if(!isNaN(lev)){
+      let dagen = m.levertijdEh==='WEEKS' ? lev*7 : lev;
+      levertijd_dagen = Math.round(dagen/7)*7;
+    }
+
+    const gesplitst = splitsOmschrijving(m.oms, m.merk, m.serie);
+    let etimVolledig = m.etim.includes(':') ? m.etim : (etimCode + (etimOms ? ':'+etimOms : ''));
+
+    // Als nl na opschonen leeg blijft maar het producttype wél herkend is, dat als terugval gebruiken
+    // (nooit leeg laten terwijl we het producttype al kennen).
+    let o1BronTekst = gesplitst.nl || etimOms || m.oms;
+    let omsNlFinal = gesplitst.nl;
+    let herkendType = guessProducttype(o1BronTekst, m.serie);
+    // Onbruikbaar resultaat (ARTIKEL-fallback, of de tekst is toevallig gelijk aan de serienaam zelf):
+    // de al bekende navigatiecategorie gebruiken als betrouwbaardere hint.
+    const serieKaal = norm(m.serie).split(':').pop().toUpperCase();
+    const onbetrouwbaar = !herkendType || herkendType === 'ARTIKEL' || herkendType.replace(/\s/g,'') === (m.merk.toUpperCase()+serieKaal).replace(/\s/g,'') || herkendType.replace(/\s/g,'') === serieKaal.replace(/\s/g,'');
+    // Trefwoorden-veld proberen als de hoofdomschrijving niks bruikbaars opleverde — bevat vaak juist
+    // de duidelijke producttype-aanduiding (bijv. 'Inbouwbad', 'Rechthoekige baden') die in de
+    // afgekapte hoofdomschrijving ontbreekt.
+    let onbetrouwbaarNaTrefwoorden = onbetrouwbaar;
+    if(onbetrouwbaar && m.trefwoorden){
+      const uitTrefwoorden = guessProducttype(m.trefwoorden, m.serie);
+      const isBruikbaar = uitTrefwoorden && uitTrefwoorden !== 'ARTIKEL'
+        && uitTrefwoorden.replace(/\s/g,'') !== (m.merk.toUpperCase()+serieKaal).replace(/\s/g,'')
+        && uitTrefwoorden.replace(/\s/g,'') !== serieKaal.replace(/\s/g,'');
+      if(isBruikbaar){
+        herkendType = uitTrefwoorden;
+        o1BronTekst = m.trefwoorden;
+        onbetrouwbaarNaTrefwoorden = false;
+      }
+    }
+    let navHintGebruikt = false;
+    if(onbetrouwbaarNaTrefwoorden && nav){
+      const navHint = NAV_NAAR_PRODUCTTYPE.find(([re]) => re.test(nav));
+      if(navHint){
+        herkendType = navHint[1];
+        o1BronTekst = herkendType;
+        if(!etimVolledig || !etimVolledig.startsWith('EC') || !etimVolledig.includes(':DYNAMIC:ETIM')){ etimVolledig = navHint[2]+':DYNAMIC:ETIM'; navHintGebruikt = true; }
+      }
+    }
+    if(!omsNlFinal && herkendType && herkendType !== 'ARTIKEL'){
+      omsNlFinal = herkendType.split(' ').map(w => w.charAt(0)+w.slice(1).toLowerCase()).join(' ');
+    }
+
+    // Hansgrohe/AXOR-specifiek: hun PAB-omschrijvingen zijn sterk afgekort en de losse
+    // classificatie/navigatie/salescode die in het PAB-bronbestand staat is regelmatig verouderd of
+    // onjuist gekoppeld. Structureel corrigeren i.p.v. losse eenmalige scripts, zodat elke toekomstige
+    // Hansgrohe/AXOR-batch dit automatisch goed doet.
+    if(/^(hansgrohe|axor)$/i.test(m.merk)){
+      const etimCodeKaal = etimVolledig.split(':')[0];
+      const hgInfo = HANSGROHE_ETIM_NAV[etimCodeKaal];
+
+      // 1) Kleur decoderen uit de merk-eigen afkorting als de standaard-herkenning niks vond
+      let hgKleurAfk = '';
+      if(!gesplitst.kleur){
+        const {naam, afk} = hansgroheKleurDecode(m.oms);
+        if(naam){ gesplitst.kleur = naam; hgKleurAfk = afk; }
+      } else {
+        hgKleurAfk = (hansgroheKleurDecode(gesplitst.kleur).afk) || (hansgroheKleurDecode(m.oms).afk);
+      }
+
+      // 2) nl-tekst herschrijven: afkortingen naar volledige NL-termen, merk/serie/kleur eraf
+      let hgNl = norm(m.oms).replace(/^(AXOR|AX|HG|hansgrohe)\s+/i, '');
+      let serieSub = norm(m.serie).includes(':') ? norm(m.serie).split(':').pop() : norm(m.serie);
+      // Serie kan zelf ook al met het merk beginnen (bijv. 'AXOR:AXOR One') — dat merk-woord dan
+      // ook uit de serie-substring strippen zodat alleen 'One' hoeft te matchen, niet 'AXOR One'
+      serieSub = serieSub.replace(new RegExp('^'+norm(m.merk).replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s+','i'), '');
+      if(serieSub) hgNl = hgNl.replace(new RegExp('\\b'+serieSub.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','ig'), '');
+      for(const [patroon] of HANSGROHE_KLEUR_DECODE) hgNl = hgNl.replace(patroon, '');
+      for(const [patroon, vervanging] of HANSGROHE_NL_VERVANG) hgNl = hgNl.replace(patroon, vervanging);
+      hgNl = hgNl.replace(/\s*,\s*-\s*/g,', ').replace(/\s+,\s*/g,', ').replace(/,\s*,+/g,',').replace(/\s{2,}/g,' ').trim(' ,-');
+      if(hgNl && hgNl.length >= 3){
+        hgNl = hgNl.charAt(0).toUpperCase() + hgNl.slice(1);
+        omsNlFinal = hgNl.slice(0,80);
+      } else if(hgInfo){
+        omsNlFinal = hgInfo[0]; // terugval: producttype-naam, nooit leeg laten
+      }
+
+      // 3) Classificatie + navigatie: geverifieerde combinatie gebruiken, PAB-eigen waarde nooit
+      // blind vertrouwen voor Hansgrohe/AXOR
+      if(hgInfo){
+        etimVolledig = `${etimCodeKaal}:${hgInfo[0]}:DYNAMIC:ETIM`;
+        nav = hgInfo[1];
+      }
+
+      // 4) Salescode: alleen D-groepen (nieuwe salesgroepen) — niet-D altijd vervangen, ook exacte matches
+      if(!salescode || !/^D/i.test(salescode)){
+        const fallback = hgInfo ? HANSGROHE_SALESCODE_FALLBACK[etimCodeKaal] : null;
+        if(fallback){ salescode = fallback; salescodeOnzeker = true; }
+      }
+
+      // 5) Omschrijving 1: volledige producttype-naam meegeven zodat guessProducttype dit herkent via
+      // de standaard PRODUCTTYPE_ABBR-tabel (die de canonieke afkorting bepaalt), kleur achteraan
+      if(hgInfo){
+        herkendType = hgInfo[0];
+        o1BronTekst = hgKleurAfk ? `${hgInfo[0]} ${hgKleurAfk}` : hgInfo[0];
+      }
+    }
+
+    // Bette-specifiek: 'AS' in het (kale, artikelnummer-deel vóór een eventuele komma-suffix) betekent
+    // BetteAntislip Sense is inbegrepen; ',T1' betekent Minimum-douchebakdrager voorgemonteerd. Dit
+    // zijn harde, betrouwbare indicatoren uit het artikelnummer zelf — beter dan de vaak afgekapte
+    // PAB-vrije-tekst, waar dit soort kenmerken er door de 70-tekenlimiet regelmatig uitvallen.
+    // Consistent altijd in Omschrijving additioneel zetten (niet wisselend per artikel tussen nl en
+    // additioneel), en alleen naar nl uitwijken als het echt niet in additioneel past.
+    if(/^bette$/i.test(m.merk)){
+      const artnrKaal = norm(m.artnr).split(',')[0];
+      const kenmerkenBette = [];
+      if(/AS$/i.test(artnrKaal)) kenmerkenBette.push('Antislip');
+      if(/,\s*T1$/i.test(norm(m.artnr))) kenmerkenBette.push('Minimum-douchebakdrager voorgemonteerd');
+      for(const kenmerk of kenmerkenBette){
+        if((omsNlFinal||'').toLowerCase().includes(kenmerk.toLowerCase().split(' ')[0])) continue; // al aanwezig
+        if((gesplitst.additioneel ? gesplitst.additioneel+', '+kenmerk : kenmerk).length <= 50){
+          gesplitst.additioneel = gesplitst.additioneel ? gesplitst.additioneel+', '+kenmerk : kenmerk;
+        } else {
+          const metNl = omsNlFinal ? `${omsNlFinal}, ${kenmerk}` : kenmerk;
+          if(metNl.length <= 80) omsNlFinal = metNl;
+        }
+      }
+    }
+
+    return {
+      ...m, salescode, salescodeGeldig, salescodeOnzeker, nav, etim: etimVolledig, etimGok: navHintGebruikt,
+      leverancierCode: leverancierCodePerMerk[m.merk.toUpperCase()] || '',
+      fabrikantNaam: fabrikantNaamPerMerk[m.merk.toUpperCase()] || '',
+      o1: proposeO1(o1BronTekst, m.artnr, m.serie, m.oms, m.merk),
+      o2: proposeO2(m.merk, m.serie, m.artnr),
+      omsNl: omsNlFinal, kleur: gesplitst.kleur || m.kleur || '', kleurOnzeker: gesplitst.kleurOnzeker, afmeting: gesplitst.afmeting, additioneel: gesplitst.additioneel,
+      gewicht_gr, diepte_mm, hoogte_mm, breedte_mm, levertijd_dagen, cnGok
+    };
+  });
+
+  log(`Klaar met opzoeken. Zonder salescode: ${nGeenSalescode}. Zonder navigatiecategorie: ${nGeenNav}.`);
+
+  const ws1 = ws1pre;
+  const ws2 = wbT2pre.worksheets.find(w=>/article/i.test(w.name)) || wbT2pre.worksheets[wbT2pre.worksheets.length-1];
+
+  const sugCols = [];
+  ws1.getRow(1).eachCell((cell,col)=>{
+    const h = norm(cell.value);
+    if(/suggestie omschrijving/i.test(h)) sugCols.push(col);
+    if(/omschrijving artikel\[(de|zh|en|ja)\]/i.test(h)) sugCols.push(col);
+  });
+  sugCols.sort((a,b)=>b-a).forEach(col=>ws1.spliceColumns(col, 1));
+  if(sugCols.length) log(`${sugCols.length} overbodige kolom(men) verwijderd (Suggestie + buitenlandse omschrijvingen).`);
+
+  for(let c=1; c<=ws1.columnCount; c++){ ws1.getRow(2).getCell(c).value = null; }
+  for(let c=1; c<=ws2.columnCount; c++){ ws2.getRow(2).getCell(c).value = null; }
+
+  const CAL12 = { name:'Calibri', size:12, bold:false, italic:false };
+  const headerMap1 = {};
+  ws1.getRow(1).eachCell((cell,col)=>{ headerMap1[norm(cell.value)] = col; });
+  const headerMap2 = {};
+  ws2.getRow(1).eachCell((cell,col)=>{ headerMap2[norm(cell.value)] = col; });
+
+  function findCol(map, needle){
+    for(const k in map){ if(k.toLowerCase().includes(needle.toLowerCase())) return map[k]; }
+    return null;
+  }
+
+  const cols1 = {
+    o1: findCol(headerMap1,'Omschrijving 1'), o2: findCol(headerMap1,'Omschrijving 2'),
+    artnr: findCol(headerMap1,'Artikelnummer Leverancier'), ean: findCol(headerMap1,'EAN'),
+    sales: findCol(headerMap1,'Sales code'), navcat: findCol(headerMap1,'Navigatie'),
+    prijs: findCol(headerMap1,'Verkoopprijzen'), merk: findCol(headerMap1,'Merk'), serie: findCol(headerMap1,'Serie'),
+    classcat: findCol(headerMap1,'Classificatie Categorieën'), intrastat: findCol(headerMap1,'Intrastat'),
+    omsNl: findCol(headerMap1,'Omschrijving artikel[nl]') || findCol(headerMap1,'Omschrijving artikel'),
+    additioneel: findCol(headerMap1,'Omschrijving additioneel'),
+    kleur: findCol(headerMap1,'Omschrijving Kleur'), afmetingen: findCol(headerMap1,'Omschrijving afmetingen'),
+    catVersie: findCol(headerMap1,'Catalogus versie'), artnrFab: findCol(headerMap1,'Artikelnummer fabrikant'),
+    pimnr: findCol(headerMap1,'PIM nummer'),
+    leverancier: findCol(headerMap1,'Leverancier'), fabrikant: findCol(headerMap1,'Fabrikant')
+  };
+  const cols2 = {
+    ean: findCol(headerMap2,'Ean'), gewicht: findCol(headerMap2,'Brutogewicht') || findCol(headerMap2,'gewicht'),
+    gewichtEh: findCol(headerMap2,'Gewichtseenheid'), hoofdlocatie: findCol(headerMap2,'Hoofdlocatie'),
+    diepte: findCol(headerMap2,'Diepte'), hoogte: findCol(headerMap2,'Hoogte'), breedte: findCol(headerMap2,'Breedte'),
+    afmEh: findCol(headerMap2,'Afmetingen eenheid'), doorlooptijd: findCol(headerMap2,'Doorlooptijd'),
+    moq: findCol(headerMap2,'MOQ'), besteleh: findCol(headerMap2,'Besteleenheid'),
+    verpeh: findCol(headerMap2,'Verpakkingseenheid'), aantalGeb: findCol(headerMap2,'Aantal gebruikseenheden'),
+    gebEh: findCol(headerMap2,'Gebruikseenheid'), catVersie: findCol(headerMap2,'Catalogus versie'),
+    product: findCol(headerMap2,'Product')
+  };
+
+  // Rij 3 (macro-standaardrij) van Workflow deel 2 — ontbrak volledig, nu net als bij deel 1 gevuld.
+  let nRij3Ingevuld = 0;
+  const RIJ3_DEFAULTS_2 = {
+    hoofdlocatie:'1110', moq:'1', gewichtEh:'GM', afmEh:'MM',
+    besteleh:'EA', verpeh:'EA', aantalGeb:'1', gebEh:'EA'
+  };
+  for(const key in RIJ3_DEFAULTS_2){
+    const col = cols2[key];
+    if(col && !norm(ws2.getRow(3).getCell(col).value)){
+      ws2.getRow(3).getCell(col).value = RIJ3_DEFAULTS_2[key];
+      ws2.getRow(3).getCell(col).font = CAL12;
+      nRij3Ingevuld++;
+    }
+  }
+
+  // Rij 3 (macro-standaardrij): alleen invullen als nog leeg, nooit een bestaande waarde overschrijven
+  const RIJ3_DEFAULTS = {
+    'Stocking Type':'P', 'Tonen in folders/catalogus':'True', 'Tonen op consumentensite':'False',
+    'Tonen in de webshop':'True', 'Uitsluiting voor Kanaal+':'D', 'Assortiment':'PLIEGER',
+    'Goedkeuringsstatus':'check', 'Index Nummer Prof':'5555', 'Index Prof':'555555555:Online:indexProfCatalog',
+    'Indicatie breekbaar':'False', 'Verkoop eenheid':'EA', 'Inhoudseenheid':'EA',
+    'Hoeveelheid verpakkingen':'1', 'Commerciële data is verrijkt':'True', 'Minimale bestelhoeveelheid klant':'1',
+    'Courantheidscode':'1', 'Catalogus versie*^':'New:pliegerProductCatalog'
+  };
+  for(const veld in RIJ3_DEFAULTS){
+    const col = findCol(headerMap1, veld);
+    if(col && !norm(ws1.getRow(3).getCell(col).value)){
+      ws1.getRow(3).getCell(col).value = RIJ3_DEFAULTS[veld];
+      ws1.getRow(3).getCell(col).font = CAL12;
+      nRij3Ingevuld++;
+    }
+  }
+  // Classificatie/Navigatie/Verkoopprijs hebben in het echte importbestand een vaste 'staart' in
+  // rij 3, die in rij 4+ wordt aangevuld met het per-artikel-specifieke deel.
+  const RIJ3_STAARTEN = {
+    classcat: ':DYNAMIC:ETIM',
+    navcat: ':Staged:pliegerProductCatalog',
+    prijs: ' EUR:G::1 EA::'
+  };
+  for(const key in RIJ3_STAARTEN){
+    const col = cols1[key];
+    if(col && !norm(ws1.getRow(3).getCell(col).value)){
+      ws1.getRow(3).getCell(col).value = RIJ3_STAARTEN[key];
+      ws1.getRow(3).getCell(col).font = CAL12;
+      nRij3Ingevuld++;
+    }
+  }
+  if(nRij3Ingevuld) log(`${nRij3Ingevuld} standaardwaarde(n) in rij 3 aangevuld.`);
+
+  // Als geen enkel artikel een PIM-nummer heeft: X zetten in rij 3 kolom B (PIM nummer)
+  // als signaal voor SAP dat alle nummers nog ontbreken en toegewezen moeten worden.
+  if(cols1.pimnr){
+    const heeftPimNrs = results.some(r => {
+      const row = existingRowByArtnr[r.artnr.toUpperCase()];
+      return row && norm(ws1.getRow(row).getCell(cols1.pimnr).value);
+    });
+    if(!heeftPimNrs && !norm(ws1.getRow(3).getCell(cols1.pimnr).value)){
+      ws1.getRow(3).getCell(cols1.pimnr).value = 'X';
+      ws1.getRow(3).getCell(cols1.pimnr).font = CAL12;
+      log('Geen PIM-nummers aanwezig — X geplaatst in rij 3 kolom B als signaal voor SAP.');
+    }
+  }
+
+  // Rij 3 mag ALLEEN macro-standaardwaarden bevatten - nooit per-artikel-specifieke data (Sales code,
+  // PIM nummer, EAN, Artikelnummer, Merk, Serie, Omschrijvingen, Intrastat). Als daar door een eerdere
+  // testronde toch iets in is blijven staan, ruimt de tool dat nu op (anders wordt zo'n restant ten
+  // onrechte 'leidend' voor alle rijen zodra het ingevuld is).
+  const RIJ3_VERBODEN_VELDEN = ['sales','ean','artnr','artnrFab','pimnr','merk','serie','intrastat','o1','o2','omsNl','kleur','afmetingen','additioneel'];
+  let nRij3Opgeruimd = 0;
+  for(const veld of RIJ3_VERBODEN_VELDEN){
+    const col = cols1[veld];
+    if(col && norm(ws1.getRow(3).getCell(col).value)){
+      ws1.getRow(3).getCell(col).value = null;
+      nRij3Opgeruimd++;
+    }
+  }
+  if(nRij3Opgeruimd) log(`${nRij3Opgeruimd} per-artikel-waarde(n) uit rij 3 opgeruimd (hoorden daar niet te staan).`);
+
+  // Intrastat: index van bekende codes per merk+serie, voor vergelijkbaar-artikel-matching
+  const intrastatByGroep = {};
+  if(cols1.intrastat && cols1.merk && cols1.serie){
+    for(let r=4; r<=ws1.rowCount; r++){
+      const code = norm(ws1.getRow(r).getCell(cols1.intrastat).value);
+      if(!code) continue;
+      const merkV = norm(ws1.getRow(r).getCell(cols1.merk).value).toUpperCase();
+      const serieV = norm(ws1.getRow(r).getCell(cols1.serie).value).toUpperCase();
+      const key = merkV+'|'+serieV;
+      if(!intrastatByGroep[key]) intrastatByGroep[key] = code;
+    }
+  }
+
+  const aiSuggesties = {};
+  const useAI = document.getElementById('f-use-ai').checked;
+  const apiKey = norm(document.getElementById('f-apikey').value);
+  if(useAI && cols1.intrastat){
+    if(!apiKey){
+      log('AI-aanvulling overgeslagen: geen API-key ingevuld.');
+    } else {
+      const teDoen = results.filter(r=>{
+        const bestaand = existingRowByArtnr[r.artnr.toUpperCase()] ? norm(ws1.getRow(existingRowByArtnr[r.artnr.toUpperCase()]).getCell(cols1.intrastat).value) : '';
+        const groepKey = r.merk.toUpperCase()+'|'+r.serie.toUpperCase();
+        return !bestaand && !r.intrastatEigen && !r.cnGok && !r.intrastatGok && !intrastatByGroep[groepKey];
+      });
+      log(`AI-aanvulling: ${teDoen.length} artikel(en) zonder eigen, tabel- of vergelijkbare intrastat-code. Zoeken op tarief.douane.nl...`);
+      for(let i=0;i<teDoen.length;i++){
+        const r = teDoen[i];
+        log(`  [${i+1}/${teDoen.length}] ${r.artnr} — ${r.merk} ${r.serie}...`);
+        try{
+          const code = await zoekIntrastatViaAI(r.oms || (r.merk+' '+r.serie), r.merk, r.serie, apiKey);
+          if(code){ aiSuggesties[r.artnr] = code; log(`    → ${code} (AI-voorstel, controleer!)`); }
+          else log(`    → geen code gevonden`);
+        }catch(e){
+          log(`    → fout: ${e.message}`);
+        }
+        await new Promise(res=>setTimeout(res, 400));
+      }
+    }
+  }
+
+  const ean2Row = {};
+  if(cols2.ean){
+    for(let r=4; r<=ws2.rowCount; r++){
+      const v = norm(ws2.getRow(r).getCell(cols2.ean).value);
+      if(v) ean2Row[v] = r;
+    }
+  }
+  let nextNewRow1 = lastExistingRow + 1;
+  let nextNewRow2 = Math.max(lastExistingRow, ws2.rowCount>=4 ? ws2.rowCount : 3) + 1;
+
+  // Herleidbaarheidslog: houdt per artikel bij welke velden zijn afgeleid/gegokt i.p.v. rechtstreeks
+  // uit een betrouwbare bron gekomen, en via welke methode — voor het aparte logbestand.
+  const herleidbaarheidsLog = [];
+  const logVeld = (artnr, veld, bron, toelichting='') => {
+    herleidbaarheidsLog.push({ artnr, veld, bron, toelichting });
+  };
+
+  results.forEach(r=>{
+    const row = existingRowByArtnr[r.artnr.toUpperCase()] || (nextNewRow1++);
+    const cell = (col)=>ws1.getRow(row).getCell(col);
+
+    // Kleur bepalen vóórdat Omschrijving 1 wordt geschreven: als de tool zelf niks vond, alsnog
+    // proberen uit een eventueel al aanwezige Omschrijving artikel[nl]-tekst te halen.
+    const bestaandeNlVoorO1 = cols1.omsNl ? norm(cell(cols1.omsNl).value) : '';
+    let kleurTeSchrijven = '', kleurTeSchrijvenOnzeker = false;
+    if(state.leverancierlijstLookup){
+      kleurTeSchrijven = state.leverancierlijstLookup.byArtnr[r.artnr.toUpperCase()] || state.leverancierlijstLookup.byEan[r.ean] || '';
+    }
+    if(!kleurTeSchrijven){ kleurTeSchrijven = r.kleur; kleurTeSchrijvenOnzeker = r.kleurOnzeker; }
+    // Check ook de rauwe PAB-omschrijving vóór stripping (bevat kleur nog wel)
+    if(r.oms){
+      const uitRauw = kleurUitVrijeTekst(r.oms);
+      if(uitRauw){
+        // Gebruik de rauwe versie als die uitgebreider is dan wat we al hebben (bijv. 'Wit Hoogglans' > 'Wit')
+        if(!kleurTeSchrijven || uitRauw.length > kleurTeSchrijven.length){
+          kleurTeSchrijven = uitRauw;
+          kleurTeSchrijvenOnzeker = !KLEUR_ABBR.some(([re]) => re.test(uitRauw));
+        }
+      }
+    }
+    if(!kleurTeSchrijven && bestaandeNlVoorO1){
+      const uitBestaand = kleurUitVrijeTekst(bestaandeNlVoorO1);
+      if(uitBestaand){
+        kleurTeSchrijven = uitBestaand;
+        kleurTeSchrijvenOnzeker = !KLEUR_ABBR.some(([re]) => re.test(uitBestaand));
+      }
+    }
+    if(!kleurTeSchrijven && r.o1.kleurUitArtnr){
+      kleurTeSchrijven = r.o1.kleurUitArtnr.volledig;
+      kleurTeSchrijvenOnzeker = false; // chroom/zwart zijn met zekerheid bekende conventies
+    }
+    // Als O1 nog geen kleurafkorting heeft, maar we hebben er inmiddels wél één met zekerheid uit
+    // Omschrijving Kleur/nl gehaald (herkend in KLEUR_ABBR), die dan alsnog toevoegen aan O1.
+    // Als O1 nog geen kleurafkorting heeft, maar we hebben er inmiddels wél een kleur uit
+    // Omschrijving Kleur/nl/leverancierslijst gehaald, die er alsnog aan toevoegen — met de vaste
+    // afkorting als die bekend is, anders de generieke mechanische afkorting (dan als onzeker
+    // gemarkeerd, want dat is een gegenereerde afkorting, geen geverifieerde).
+    // Robuust vangnet: ongeacht via welk pad de kleur precies gevonden is (of al in de cel stond van
+    // een eerdere run), controleren of die kleur nog los in de nl-tekst voorkomt en die dan alsnog
+    // verwijderen — voorkomt dubbeling ('Hangkast... - Mocca mat lac' + Kleur='Mocca mat lac' naast
+    // elkaar) ongeacht welke eerdere stap het miste.
+    const kleurVoorVangnet = kleurTeSchrijven || (cols1.kleur ? norm(cell(cols1.kleur).value) : '');
+    if(kleurVoorVangnet && cols1.omsNl){
+      const huidigeNl = norm(cell(cols1.omsNl).value) || r.omsNl || '';
+      if(huidigeNl.toLowerCase().includes(kleurVoorVangnet.toLowerCase())){
+        const kleurEsc = kleurVoorVangnet.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+        const nlSchoon = huidigeNl
+          .replace(new RegExp('\\s*-\\s*'+kleurEsc+'\\s*$', 'i'), '')
+          .replace(new RegExp(',?\\s*'+kleurEsc+'\\s*$', 'i'), '')
+          .replace(/\s*-\s*$/, '').replace(/,\s*$/, '').trim();
+        if(nlSchoon && nlSchoon.length < huidigeNl.length){
+          r.omsNl = nlSchoon;
+          if(cols1.omsNl) cell(cols1.omsNl).value = nlSchoon;
+        }
+      }
+    }
+
+    let o1Tekst = r.o1.tekst, o1Onzeker = r.o1.onzeker;
+    if(kleurTeSchrijven){
+      const kleurAbbrMatch = KLEUR_ABBR.find(([re]) => re.test(kleurTeSchrijven));
+      let kleurAbbr = kleurAbbrMatch ? kleurAbbrMatch[1] : '';
+      if(!kleurAbbr && !kleurTeSchrijvenOnzeker){
+        kleurAbbr = afkortKleurGeneriek(kleurTeSchrijven);
+        if(kleurAbbr) o1Onzeker = true;
+      } else if(kleurAbbrMatch && kleurTeSchrijvenOnzeker){
+        o1Onzeker = true; // wel een afkorting gevonden, maar de kleur zelf was al onzeker
+      }
+      if(kleurAbbr && !o1Tekst.includes(kleurAbbr)){
+        let aangevuld = `${o1Tekst} ${kleurAbbr}`;
+        if(aangevuld.length > 30){
+          // Kleur nooit laten vallen: eerst THERMO -> THER, dan iteratief het woord met de MEESTE
+          // klinkers verkorten (meestal het producttype-woord, niet per se het laatste woord — een
+          // afmeting als '40X85CM' aan het eind heeft bijvoorbeeld geen klinkers om te verwijderen),
+          // tot de kleurafkorting er wél volledig bij past.
+          let verkort = o1Tekst.replace(/^THERMO\b/, 'THER');
+          if((verkort+' '+kleurAbbr).length > 30){
+            const delen2 = verkort.split(' ');
+            const telKlinkers = (w) => (w.match(/[aeiou]/gi) || []).length;
+            let pogingen = 0;
+            while((delen2.join(' ')+' '+kleurAbbr).length > 30 && pogingen < 20){
+              const klinkerTelling = delen2.map(telKlinkers);
+              const maxKlinkers = Math.max(...klinkerTelling);
+              if(maxKlinkers === 0) break; // geen klinkers meer te verwijderen
+              const idx = klinkerTelling.indexOf(maxKlinkers);
+              delen2[idx] = verkortDoorKlinkersTeHalen(delen2[idx], delen2[idx].length - 1);
+              pogingen++;
+            }
+            verkort = delen2.join(' ');
+          }
+          aangevuld = `${verkort} ${kleurAbbr}`;
+        }
+        o1Tekst = aangevuld.length <= 30 ? aangevuld : aangevuld.slice(0,30);
+      }
+    }
+
+    if(cols1.o1 && !norm(cell(cols1.o1).value)){
+      cell(cols1.o1).value = o1Tekst;
+      if(o1Onzeker) logVeld(r.artnr, 'Omschrijving 1', 'Onzeker/afgeleid', 'Producttype- of kleurafkorting niet uit de vaste tabel, mechanisch gegenereerd');
+    }
+    if(cols1.o2 && !norm(cell(cols1.o2).value)) cell(cols1.o2).value = r.o2;
+    if(cols1.artnr) cell(cols1.artnr).value = r.artnr;
+    if(cols1.catVersie && !norm(cell(cols1.catVersie).value)) cell(cols1.catVersie).value = 'New:pliegerProductCatalog';
+    if(cols1.artnrFab && !norm(cell(cols1.artnrFab).value)) cell(cols1.artnrFab).value = r.artnr;
+    const levNaam = r.fabrikantNaam || r.merk || '';
+    const levNr = leveranciersNummerByNaam[levNaam.toUpperCase()] || r.leverancierCode || '';
+    if(cols1.leverancier && levNr && !norm(cell(cols1.leverancier).value)) cell(cols1.leverancier).value = levNr;
+    if(cols1.fabrikant && levNr && !norm(cell(cols1.fabrikant).value)) cell(cols1.fabrikant).value = levNr;
+    if(cols1.ean && !norm(cell(cols1.ean).value)) cell(cols1.ean).value = r.ean;
+    if(cols1.merk && !norm(cell(cols1.merk).value)) cell(cols1.merk).value = r.merk;
+    if(cols1.serie && !norm(cell(cols1.serie).value)){
+      const serieMetMerk = norm(r.serie).toUpperCase().startsWith(norm(r.merk).toUpperCase()+':') ? r.serie : (r.merk ? r.merk+':'+r.serie : r.serie);
+      cell(cols1.serie).value = serieMetMerk;
+    }
+    // Classificatie/navigatie/intrastat: eerst de berekende waarden uit r gebruiken;
+    // als die leeg zijn, opnieuw raden op basis van de daadwerkelijk geschreven nl-waarde.
+    // Dit vangt ook artikelen op waarvan de nl eerder kapot was maar nu correct is.
+    const ETIM_TABEL_RUNTIME = [
+      [/wc-zitting|toiletzitting|toiletbril/i,'EC010108:Toiletzitting:DYNAMIC:ETIM',   '01.10.09:Toiletzittingen:Staged:pliegerProductCatalog',       '39241000'],
+      [/wand.?wc|wand.?toilet|wandcloset/i,  'EC010107:Wandcloset:DYNAMIC:ETIM',      '01.10.01:Wandclosets:Staged:pliegerProductCatalog',           '69101000'],
+      [/staand.?wc|staand.?toilet|staand.?closet/i,'EC010106:Staand closet:DYNAMIC:ETIM','01.10.02:Staande closets:Staged:pliegerProductCatalog',    '69101000'],
+      [/reservoir|spoelreservoir/i,          'EC010142:Spoelreservoir:DYNAMIC:ETIM',  '02.09.04:Opbouwreservoirs:Staged:pliegerProductCatalog',      '39241000'],
+      [/inbouwreservoir/i,                   'EC010142:Spoelreservoir:DYNAMIC:ETIM',  '01.10.06:Toebehoren voor inbouwreservoirs:Staged:pliegerProductCatalog','39241000'],
+      [/wastafel|fontein/i,                  'EC010104:Wastafel:DYNAMIC:ETIM',        '01.11.05:Wastafels:Staged:pliegerProductCatalog',             '69101000'],
+      [/af-?\s*en\s*overloopgarnituur|overloopgarnituur|afvoerplug|afvoergarnituur/i,'EC000381:Af- en overloopgarnituur:DYNAMIC:ETIM','01.03.03:Toebehoren voor baden:Staged:pliegerProductCatalog','39229000'],
+      [/geluidsisolatieset/i,                'EC010849:Geluidsisolatieset opvangtoestellen:DYNAMIC:ETIM','01.03.03:Toebehoren voor baden:Staged:pliegerProductCatalog','39229000'],
+      [/beluchter/i,                         'EC010131:Beluchter:DYNAMIC:ETIM',       '02.02.06:Beluchters:Staged:pliegerProductCatalog',            '39174000'],
+      [/muurplaat|verloopset|verl\.?\s*set|knelkoppeling|fitting/i,'EC003024:Fitting met 2 aansluitingen:DYNAMIC:ETIM','02.06.05:Persfittingen:Staged:pliegerProductCatalog','39229000'],
+      [/onderdel|membraan|steunplaat|stelpennen|montage.?set/i,'EC011339:Toebehoren/onderdelen voor spoelreservoir:DYNAMIC:ETIM','01.10.06:Toebehoren voor inbouwreservoirs:Staged:pliegerProductCatalog','39229000'],
+      [/bedieningsplaat|bedieningsknop/i,     'EC010063:Bedieningsplaat spoelsysteem:DYNAMIC:ETIM','01.10.01:Bedieningspanelen:Staged:pliegerProductCatalog','39229000'],
+      [/uitlaatklep|uitstroommechanisme/i,    'EC011339:Toebehoren/onderdelen voor spoelreservoir:DYNAMIC:ETIM','01.10.06:Toebehoren voor inbouwreservoirs:Staged:pliegerProductCatalog','39229000'],
+      [/douchebak/i,                         'EC011443:Douchebak:DYNAMIC:ETIM',       '01.05.02:Douchebakken:Staged:pliegerProductCatalog',          '39221000'],
+      [/badkuip|ligbad|\bbad\b|bade[wnr]/i, 'EC011609:Bad:DYNAMIC:ETIM',             '01.03.01:Baden:Staged:pliegerProductCatalog',                 '39221000'],
+      [/doucheslang/i,                       'EC011535:Doucheslang:DYNAMIC:ETIM',     '01.05.04.05:Doucheslangen:Staged:pliegerProductCatalog',      '39173200'],
+      [/hoofddoucheset|doucheset/i,          'EC010109:Glijstangcombinatie:DYNAMIC:ETIM','01.05.04.04:Glijstangcombinatie:Staged:pliegerProductCatalog','84818039'],
+      [/hoofddouche/i,                       'EC010161:Handdouche:DYNAMIC:ETIM',      '01.05.04.01:Handdouches:Staged:pliegerProductCatalog',        '84818039'],
+      [/handdouche/i,                        'EC010161:Handdouche:DYNAMIC:ETIM',      '01.05.04.01:Handdouches:Staged:pliegerProductCatalog',        '84818039'],
+      [/glijstang/i,                         'EC010140:Glijstang:DYNAMIC:ETIM',       '01.05.04.03:Glijstangen:Staged:pliegerProductCatalog',        '84818039'],
+      [/douchemengkraan|douchekraan/i,       'EC011329:Douchemengkraan:DYNAMIC:ETIM', '01.06.04:Douchekranen:Staged:pliegerProductCatalog',          '84818039'],
+      [/badmengkraan|badkraan/i,             'EC010862:Badmengkraan:DYNAMIC:ETIM',    '01.06.01:Badkranen:Staged:pliegerProductCatalog',             '84818039'],
+      // Geverifieerde codes uit de memory — nooit opnieuw afleiden, letterlijk overnemen
+      [/brandmanchet/i,                      'EC011553:Brandmanchet voor buis:DYNAMIC:ETIM','02.12.04:Brandmanchetten:Staged:pliegerProductCatalog',   '68061000'],
+      [/zelfklevende\s*tape|duct\s*tape|weefsel\s*tape/i,'EC000128:Zelfklevende tape:DYNAMIC:ETIM','02.11.05:Tape:Staged:pliegerProductCatalog',        '39199080'],
+      [/aluminium\s*tape/i,                  'EC000128:Zelfklevende tape:DYNAMIC:ETIM','02.11.05:Tape:Staged:pliegerProductCatalog',                  '76129090'],
+      [/kabelbinder/i,                       'EC000046:Kabelbinder:DYNAMIC:ETIM',     '02.03.19:Kabelbinders:Staged:pliegerProductCatalog',           '39269097'],
+      [/reciprozaagblad/i,                   'EC002239:Reciprozaagblad:DYNAMIC:ETIM', '02.07.01:Handgereedschap:Staged:pliegerProductCatalog',        '82023900'],
+      [/plamuurmes|spatel/i,                 'EC000152:Plamuurmes/spatel:DYNAMIC:ETIM','02.10:Handgereedschap:Staged:pliegerProductCatalog',          '82054000'],
+      [/\brasp\b/i,                          'EC000806:Rasp:DYNAMIC:ETIM',            '02.07.01:Handgereedschap:Staged:pliegerProductCatalog',        '82055100'],
+      [/veiligheidshandschoen/i,             'EC002099:Veiligheidshandschoen:DYNAMIC:ETIM','02.11.03:Handschoenen:Staged:pliegerProductCatalog',      '40159500'],
+      [/combinatietang/i,                    'EC000836:Combinatietang:DYNAMIC:ETIM',  '02.07.01:Handgereedschap:Staged:pliegerProductCatalog',        '82037000'],
+      [/afteken.*meetgereedschap|meetgereedschap/i,'EC003009:Toebehoren afteken-/meetgereedschap:DYNAMIC:ETIM','02.07.01:Handgereedschap:Staged:pliegerProductCatalog','90178000'],
+      [/vuilwaterdompelpomp/i,               'EC010733:Vuilwaterdompelpomp:DYNAMIC:ETIM','03.07.04:Dompelpompen:Staged:pliegerProductCatalog',        '84137030'],
+      [/condenswaterpomp/i,                  'EC011712:Condenswaterpomp:DYNAMIC:ETIM','03.07.03:Condenswaterpompen:Staged:pliegerProductCatalog',    '84137030'],
+      [/kabelbuisklem/i,                     'EC000368:Kabelbuisklem:DYNAMIC:ETIM',   '02.03.07:Buisklemmen:Staged:pliegerProductCatalog',            '73269098'],
+      [/schroefbevestigingsset/i,            'EC011733:Schroefbevestigingsset:DYNAMIC:ETIM','02.03.06:Bevestigingssets:Staged:pliegerProductCatalog', '39229000'],
+      [/spoelreservoirvlotterkraan|vlotterkraan/i,'EC010142:Spoelreservoirvlotterkraan:DYNAMIC:ETIM','01.10.06:Toebehoren voor inbouwreservoirs:Staged:pliegerProductCatalog','84818019'],
+    ];
+    function raadEtimOpNl(nlTekst){
+      for(const [re,etim,nav,cn] of ETIM_TABEL_RUNTIME){
+        if(re.test(nlTekst)) return {etim, nav, cn};
+      }
+      return null;
+    }
+    // Schrijf omsNl EERST — zodat nlGeschreven daarna de juiste waarde leest voor de ETIM-gok
+    const bestaandeNl = norm(cell(cols1.omsNl).value);
+    // Bij bestaande rijen: alleen herschrijven als de cel leeg is, ÓF als de nieuwe waarde een
+    // opschoning is van de oude (nieuwe waarde is het begin van de oude, bijv. omdat er alsnog een
+    // kleur uit gehaald kon worden die eerder nog niet werd herkend). Zo blijft handmatig ingevoerde
+    // tekst met rust, maar een verbeterde opschoning wordt niet langer geblokkeerd.
+    const isOpschoning = bestaandeNl && r.omsNl && bestaandeNl.toLowerCase().startsWith(r.omsNl.toLowerCase()) && r.omsNl.length < bestaandeNl.length;
+    if(cols1.omsNl && (!r.fromExisting || !bestaandeNl || isOpschoning)) cell(cols1.omsNl).value = r.omsNl;
+    // Kleur ook uit het nl-veld verwijderen als die er nog in staat (bijv. bij herverwerking)
+    if(cols1.omsNl && cols1.kleur){
+      const nlNa = norm(cell(cols1.omsNl).value);
+      const kleurInNl = kleurTeSchrijven || r.kleur;
+      if(kleurInNl && nlNa.toLowerCase().includes(kleurInNl.toLowerCase())){
+        // Strip de volledige kleur-frase: herkend kleurwoord + eventuele afwerkingswoorden daarna
+        const kleurEsc = kleurInNl.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+        const nlZonderKleur = nlNa
+          .replace(new RegExp(',?\\s*'+kleurEsc+'(\\s+('+KLEUR_SIGNAL.source+'))*\\s*$', 'i'), '')
+          .replace(/[,.\s]+$/, '').trim();
+        cell(cols1.omsNl).value = nlZonderKleur.slice(0,80);
+      }
+    }
+    if(cols1.additioneel && r.additioneel && !norm(cell(cols1.additioneel).value)) cell(cols1.additioneel).value = r.additioneel;
+    if(kleurTeSchrijven) kleurTeSchrijven = kleurTeSchrijven.replace(/^[,.\s]+|[,.\s]+$/g,'').trim();
+    if(kleurTeSchrijven) kleurTeSchrijven = titlecaseKleur(kleurTeSchrijven.replace(/\s{2,}/g,' '));
+    if(cols1.kleur && kleurTeSchrijven){
+      const bestaandeKleur = norm(cell(cols1.kleur).value);
+      const inhoudelijkGelijk = bestaandeKleur && bestaandeKleur.toLowerCase() === kleurTeSchrijven.toLowerCase();
+      if(!bestaandeKleur || kleurTeSchrijven.length > bestaandeKleur.length || (inhoudelijkGelijk && kleurTeSchrijven !== bestaandeKleur))
+        cell(cols1.kleur).value = kleurTeSchrijven;
+      if(kleurTeSchrijvenOnzeker) logVeld(r.artnr, 'Omschrijving Kleur', 'Onzeker/afgeleid', 'Geen exacte match in de vaste kleurenlijst; via generieke tekstherkenning gevonden');
+    }
+    if(cols1.afmetingen && r.afmeting && !norm(cell(cols1.afmetingen).value)) cell(cols1.afmetingen).value = r.afmeting;
+
+    const nlGeschreven = norm(cell(cols1.omsNl).value);
+    let etimVoorKolom = r.etim && r.etim.includes(':DYNAMIC:ETIM') ? r.etim : null;
+    let navVoorKolom = r.nav || null;
+    let intrastatVanGok = r.intrastatGok || r.cnGok || null;
+    let isGok = !!r.etimGok;
+    if(r.etimGok) logVeld(r.artnr, 'Classificatie', 'Navigatiecategorie-hint', 'Tekstherkenning gaf geen bruikbaar producttype; teruggevallen op bekende navigatiecategorie');
+    if(!etimVoorKolom && nlGeschreven){
+      const raad = raadEtimOpNl(nlGeschreven);
+      if(raad){
+        etimVoorKolom = raad.etim; navVoorKolom = raad.nav; intrastatVanGok = raad.cn; isGok = true;
+        logVeld(r.artnr, 'Classificatie', 'Afgeleid uit nl-tekst', `Herkend via trefwoord in "${nlGeschreven.slice(0,60)}"`);
+      }
+    }
+    if(cols1.classcat && !norm(cell(cols1.classcat).value) && etimVoorKolom){
+      cell(cols1.classcat).value = etimVoorKolom;
+      if(isGok) cell(cols1.classcat).font = {name:'Calibri',size:12,bold:true,italic:false};
+    }
+    if(cols1.navcat && !norm(cell(cols1.navcat).value) && navVoorKolom) cell(cols1.navcat).value = navVoorKolom;
+    // navcat already written above with bold-flag check
+    if(cols1.prijs && r.prijs!=null && !norm(cell(cols1.prijs).value)) cell(cols1.prijs).value = `${Number(r.prijs).toFixed(2)} ${r.valuta||'EUR'}:G::1 EA::`;
+
+    if(cols1.sales) cell(cols1.sales).value = r.salescode;
+    if(r.salescodeOnzeker) logVeld(r.artnr, 'Sales code 2', 'Onzeker/afgeleid', 'Geen directe artikelnummer/EAN-match in Salescodes_assortiment gevonden');
+
+    let intrastatOnzeker = false;
+    if(cols1.intrastat){
+      const bestaand = norm(cell(cols1.intrastat).value);
+      if(!bestaand){
+        if(r.intrastatEigen){
+          cell(cols1.intrastat).value = r.intrastatEigen; // eigen PAB-waarde: zeker, niet vetgedrukt
+        } else if(intrastatVanGok || r.intrastatGok || r.cnGok){
+          cell(cols1.intrastat).value = intrastatVanGok || r.intrastatGok || r.cnGok;
+          intrastatOnzeker = true;
+          logVeld(r.artnr, 'Intrastat', 'Afgeleid via classificatie', 'Gekoppeld aan de gevonden ETIM-classificatie, niet rechtstreeks uit PAB');
+        } else {
+          const key = r.merk.toUpperCase()+'|'+r.serie.toUpperCase();
+          const overgenomen = intrastatByGroep[key] || aiSuggesties[r.artnr];
+          if(overgenomen){
+            cell(cols1.intrastat).value = overgenomen;
+            intrastatOnzeker = true; // vergelijkbaar artikel of AI-voorstel: onzeker
+            logVeld(r.artnr, 'Intrastat', intrastatByGroep[key] ? 'Overgenomen van vergelijkbaar artikel' : 'AI-voorstel', intrastatByGroep[key] ? `Zelfde merk/serie (${r.merk}/${r.serie}) als een artikel met bekende code` : 'Via Anthropic API intrastat-opzoeking');
+          }
+        }
+      }
+    }
+
+    // Eerst uniforme Calibri 12 (geen bold/italic) op alle ingevulde cellen, dan pas gericht vetgedrukt waar onzeker
+    // Expliciete kolom-voor-kolom reset i.p.v. eachCell({includeEmpty:false}) — die laatste bleek in de
+    // praktijk niet alle zojuist beschreven cellen te resetten, met bijna overal onterecht vet als gevolg.
+    const laatsteKol1 = Math.max(...Object.values(cols1).filter(Boolean), 41);
+    for(let c=1; c<=laatsteKol1; c++){ ws1.getRow(row).getCell(c).font = { name:'Calibri', size:12, bold:false, italic:false }; }
+    if(intrastatOnzeker) cell(cols1.intrastat).font = { name:'Calibri', size:12, bold:true, italic:false };
+    if(r.salescodeOnzeker && cols1.sales) cell(cols1.sales).font = { name:'Calibri', size:12, bold:true, italic:false };
+    if(o1Onzeker && cols1.o1) cell(cols1.o1).font = { name:'Calibri', size:12, bold:true, italic:false };
+    if(kleurTeSchrijvenOnzeker && cols1.kleur && kleurTeSchrijven) cell(cols1.kleur).font = { name:'Calibri', size:12, bold:true, italic:false };
+
+    const row2 = ean2Row[r.ean] || (nextNewRow2++);
+    const cell2 = (col)=>ws2.getRow(row2).getCell(col);
+    if(cols2.catVersie && !norm(cell2(cols2.catVersie).value)) cell2(cols2.catVersie).value = 'New:pliegerProductCatalog';
+    if(cols2.ean && !norm(cell2(cols2.ean).value)) cell2(cols2.ean).value = r.ean;
+    if(cols2.gewicht && r.gewicht_gr!=null) cell2(cols2.gewicht).value = r.gewicht_gr;
+    if(cols2.diepte && r.diepte_mm!=null) cell2(cols2.diepte).value = r.diepte_mm;
+    if(cols2.hoogte && r.hoogte_mm!=null) cell2(cols2.hoogte).value = r.hoogte_mm;
+    if(cols2.breedte && r.breedte_mm!=null) cell2(cols2.breedte).value = r.breedte_mm;
+    if(cols2.doorlooptijd && r.levertijd_dagen!=null) cell2(cols2.doorlooptijd).value = r.levertijd_dagen;
+
+    const laatsteKol2 = Math.max(...Object.values(cols2).filter(Boolean), 18);
+    for(let c=1; c<=laatsteKol2; c++){ ws2.getRow(row2).getCell(c).font = { name:'Calibri', size:12, bold:false, italic:false }; }
+  });
+
+  // ExcelJS laat bij het herschrijven van het sjabloon een groot deel van de workbook-brede
+  // 'defined names' vallen (de formule-motor achter de dropdowns/validaties van dit SAP-sjabloon).
+  // Een dataValidation die naar zo'n verdwenen naam verwijst (bijv. 'HeaderTypeAvaliableAttr') is
+  // precies waarom Excel bij het openen meldt dat de inhoud hersteld moet worden. Hier de originele,
+  // volledige <definedNames>-sectie uit het brontemplate terugzetten in de output.
+  function bouwSheetNaamNaarBestand(wbXml, relsXml){
+    const relMap = {};
+    for(const m of relsXml.matchAll(/<Relationship Id="([^"]+)"[^>]*Target="worksheets\/([^"]+)"/g)) relMap[m[1]] = m[2];
+    const map = {};
+    for(const m of wbXml.matchAll(/<sheet[^>]*name="([^"]+)"[^>]*r:id="([^"]+)"/g)) map[m[1]] = relMap[m[2]];
+    for(const m of wbXml.matchAll(/<sheet[^>]*r:id="([^"]+)"[^>]*name="([^"]+)"/g)) if(!map[m[2]]) map[m[2]] = relMap[m[1]];
+    return map;
+  }
+  function mergeWorksheetTag(origTag, outTag){
+    function parseAttrs(tag){
+      const attrs = {}; const re = /([a-zA-Z0-9:._-]+)="([^"]*)"/g; let m;
+      while(m = re.exec(tag)) attrs[m[1]] = m[2];
+      return attrs;
+    }
+    const origAttrs = parseAttrs(origTag), outAttrs = parseAttrs(outTag);
+    const merged = {...outAttrs};
+    for(const k in origAttrs){
+      if(k === 'mc:Ignorable'){
+        const alle = [...new Set([...(outAttrs[k]||'').split(/\s+/).filter(Boolean), ...origAttrs[k].split(/\s+/)])];
+        merged[k] = alle.join(' ');
+      } else if(!(k in outAttrs)){
+        merged[k] = origAttrs[k];
+      }
+    }
+    return '<worksheet '+Object.entries(merged).map(([k,v])=>`${k}="${v}"`).join(' ')+'>';
+  }
+
+  // Herstelt twee dingen die ExcelJS bij het herschrijven van het sjabloon laat vallen:
+  // 1) workbook-brede defined names (de formule-motor achter dropdowns/validaties)
+  // 2) per-sheet extLst-blokken (Microsoft x14-extensies, zoals extended conditional formatting)
+  // Allebei kunnen een dataValidation/CF-regel achterlaten die naar iets verwijst dat niet meer
+  // bestaat - en dát is precies wat Excel's 'inhoud herstellen'-melding veroorzaakt.
+  async function herstelDefinedNames(originalArrayBuffer, nieuwBuffer){
+    try{
+      const origZip = await JSZip.loadAsync(originalArrayBuffer);
+      const origWorkbookXml = await origZip.file('xl/workbook.xml').async('string');
+      const nieuwZip = await JSZip.loadAsync(nieuwBuffer);
+      let nieuwWorkbookXml = await nieuwZip.file('xl/workbook.xml').async('string');
+
+      const m = origWorkbookXml.match(/<definedNames>[\s\S]*?<\/definedNames>/);
+      if(m){
+        if(/<definedNames>[\s\S]*?<\/definedNames>/.test(nieuwWorkbookXml)){
+          nieuwWorkbookXml = nieuwWorkbookXml.replace(/<definedNames>[\s\S]*?<\/definedNames>/, m[0]);
+        } else {
+          nieuwWorkbookXml = nieuwWorkbookXml.replace('</workbook>', m[0]+'</workbook>');
+        }
+        nieuwZip.file('xl/workbook.xml', nieuwWorkbookXml);
+      }
+
+      const origRelsXml = await origZip.file('xl/_rels/workbook.xml.rels').async('string');
+      const nieuwRelsXml = await nieuwZip.file('xl/_rels/workbook.xml.rels').async('string');
+      const origMap = bouwSheetNaamNaarBestand(origWorkbookXml, origRelsXml);
+      const nieuwMap = bouwSheetNaamNaarBestand(nieuwWorkbookXml, nieuwRelsXml);
+      let nHersteld = 0, nKapotteStubsOpgeruimd = 0;
+      for(const naam in origMap){
+        if(!nieuwMap[naam]) continue;
+        const origPad = 'xl/worksheets/'+origMap[naam];
+        const nieuwPad = 'xl/worksheets/'+nieuwMap[naam];
+        const origSheetFile = origZip.file(origPad);
+        const nieuwSheetFile = nieuwZip.file(nieuwPad);
+        if(!origSheetFile || !nieuwSheetFile) continue;
+        const origXml = await origSheetFile.async('string');
+        let nieuwXml = await nieuwSheetFile.async('string');
+
+        // ExcelJS laat voor x14-only conditional-formatting-regels een kapotte lege stub achter
+        // (bijv. '<cfRule priority="3"/>', zonder type/dxfId/formule) - dat is ongeldig en precies
+        // wat Excel bij het openen repareert/verwijdert. Die kapotte stubs eerst opruimen.
+        const voorLeeg = nieuwXml;
+        nieuwXml = nieuwXml.replace(/<cfRule priority="\d+"\/>/g, '');
+        // Lege conditionalFormatting-wrappers (na het opruimen niks meer erin) ook weghalen
+        nieuwXml = nieuwXml.replace(/<conditionalFormatting sqref="[^"]*"><\/conditionalFormatting>/g, '');
+        if(nieuwXml !== voorLeeg){ nieuwZip.file(nieuwPad, nieuwXml); nKapotteStubsOpgeruimd++; }
+
+        const extMatch = origXml.match(/<extLst>[\s\S]*?<\/extLst>/);
+        if(extMatch && !nieuwXml.includes('<extLst>')){
+          const origTag = origXml.match(/<worksheet [^>]*>/);
+          const nieuwTag = nieuwXml.match(/<worksheet [^>]*>/);
+          if(origTag && nieuwTag) nieuwXml = nieuwXml.replace(nieuwTag[0], mergeWorksheetTag(origTag[0], nieuwTag[0]));
+          nieuwXml = nieuwXml.replace('</worksheet>', extMatch[0]+'</worksheet>');
+          nieuwZip.file(nieuwPad, nieuwXml);
+          nHersteld++;
+        }
+      }
+      if(nKapotteStubsOpgeruimd) log(`${nKapotteStubsOpgeruimd} kapotte voorwaardelijke-opmaak-stub(s) opgeruimd.`);
+      if(nHersteld) log(`${nHersteld} sjabloon-opmaakextensie(s) hersteld (extLst).`);
+      // ExcelJS zet standaard expliciete directory-entries in de zip (bijv. '_rels/', 'xl/') - dat is
+      // geen standaard OOXML/OPC-structuur. Een strikte parser (zoals SAP Backoffice's importer) kan
+      // hierdoor het bestand afwijzen. Deze entries zijn puur ruis en worden hier verwijderd.
+      // LET OP: zip.remove() verwijdert bij een directory-pad RECURSIEF ook alle bestanden eronder -
+      // daarom hier direct uit de interne files-map verwijderen, niet via .remove().
+      const dirPaden = [];
+      nieuwZip.forEach((relPath, file) => { if(file.dir) dirPaden.push(relPath); });
+      dirPaden.forEach(p => { delete nieuwZip.files[p]; });
+      if(dirPaden.length) log(`${dirPaden.length} overbodige directory-entr(y/ies) uit het bestand verwijderd.`);
+
+      // Echte oorzaak van het hardnekkige vet/cursief-probleem: ExcelJS herschrijft de dxfs
+      // (differential formats, gebruikt door voorwaardelijke opmaak voor rijbandering) en voegt
+      // daarbij foutief bold+italic toe aan definities die dat origineel niet hadden - geverifieerd
+      // tegen de referentie, die dezelfde regels zonder bold/italic definieert (alleen kleur/vulling).
+      // Dit zit in xl/styles.xml, los van individuele cel-writes - vandaar dat het bestand er per cel
+      // 'correct' uitzag maar Excel het via voorwaardelijke opmaak alsnog vet/cursief toonde.
+      // docProps/app.xml (metadata over aantal werkbladen/benoemde bereiken) verbatim uit het
+      // origineel terugzetten - ExcelJS regenereert dit zelf onjuist (telt bijv. verborgen tabbladen
+      // mee als 'Worksheets', en laat de 'Benoemde bereiken'-sectie met de 12 namen helemaal weg).
+      // De structuur (tabbladen/defined names) verandert niet door onze data-edits, dus dit mag altijd
+      // 1-op-1 terug - dit kan een van de dingen zijn die SAP Backoffice's importvalidatie laat struikelen.
+      // Kern van de SAP-afwijzing: docProps/custom.xml bevat een letterlijke handtekening
+      // ("SAP Hybris vendor v3") die zowel in de referentie als in het originele sjabloon staat,
+      // maar die ExcelJS volledig laat vallen - samen met de bijbehorende relatie en
+      // content-type-registratie. Dit is zeer waarschijnlijk precies wat SAP Backoffice's
+      // importvalidatie controleert om te bepalen of dit een 'echt' backoffice-bestand is.
+      const origCustomFile = origZip.file('docProps/custom.xml');
+      if(origCustomFile && !nieuwZip.file('docProps/custom.xml')){
+        const origCustomXml = await origCustomFile.async('string');
+        nieuwZip.file('docProps/custom.xml', origCustomXml);
+
+        // Relatie in _rels/.rels toevoegen als die er nog niet is
+        let rootRels = await nieuwZip.file('_rels/.rels').async('string');
+        if(!rootRels.includes('docProps/custom.xml')){
+          const bestaandeIds = [...rootRels.matchAll(/Id="rId(\d+)"/g)].map(m=>parseInt(m[1]));
+          const nieuwId = 'rId'+(Math.max(0,...bestaandeIds)+1);
+          const nieuwRel = `<Relationship Id="${nieuwId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties" Target="docProps/custom.xml"/>`;
+          rootRels = rootRels.replace('</Relationships>', nieuwRel+'</Relationships>');
+          nieuwZip.file('_rels/.rels', rootRels);
+        }
+
+        // Content-type-registratie toevoegen als die er nog niet is
+        let contentTypes = await nieuwZip.file('[Content_Types].xml').async('string');
+        if(!contentTypes.includes('docProps/custom.xml')){
+          const override = '<Override PartName="/docProps/custom.xml" ContentType="application/vnd.openxmlformats-officedocument.custom-properties+xml"/>';
+          contentTypes = contentTypes.replace('</Types>', override+'</Types>');
+          nieuwZip.file('[Content_Types].xml', contentTypes);
+        }
+        log('docProps/custom.xml (SAP-herkenningsmerk) hersteld.');
+      }
+
+      const origAppFile = origZip.file('docProps/app.xml');
+      const nieuwAppFile = nieuwZip.file('docProps/app.xml');
+      if(origAppFile && nieuwAppFile){
+        const origAppXml = await origAppFile.async('string');
+        nieuwZip.file('docProps/app.xml', origAppXml);
+      }
+
+      const stylesFile = nieuwZip.file('xl/styles.xml');
+      if(stylesFile){
+        let stylesXml = await stylesFile.async('string');
+        const voorStyles = stylesXml;
+        stylesXml = stylesXml.replace(/<dxfs[\s\S]*?<\/dxfs>/, dxfsBlok =>
+          dxfsBlok.replace(/<font>([\s\S]*?)<\/font>/g, (heel, inhoud) =>
+            '<font>'+inhoud.replace(/<b\/>/g,'').replace(/<i\/>/g,'')+'</font>'
+          )
+        );
+        if(stylesXml !== voorStyles){
+          nieuwZip.file('xl/styles.xml', stylesXml);
+          log('Onterecht vet/cursief in voorwaardelijke-opmaak-stijlen (dxfs) opgeruimd.');
+        }
+      }
+
+      return await nieuwZip.generateAsync({type:'uint8array'});
+    } catch(e){
+      log(`Waarschuwing: sjabloonstructuur herstellen mislukt (${e.message}). Bestand kan mogelijk een Excel-herstelmelding geven.`);
+      return nieuwBuffer;
+    }
+  }
+
+  let buf1 = await wbT1pre.xlsx.writeBuffer();
+  let buf2 = await wbT2pre.xlsx.writeBuffer();
+  buf1 = await herstelDefinedNames(state.t1, buf1);
+  buf2 = await herstelDefinedNames(state.t2, buf2);
+  const url1 = URL.createObjectURL(new Blob([buf1], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  const url2 = URL.createObjectURL(new Blob([buf2], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+
+  // Herleidbaarheidsbestand: apart xlsx met alle afgeleide/gegokte velden, zodat bij twijfel of audit
+  // meteen duidelijk is welke waarde rechtstreeks uit een bron kwam en welke is afgeleid/gegokt.
+  let url3 = null;
+  if(herleidbaarheidsLog.length){
+    const wbLog = new ExcelJS.Workbook();
+    const wsLog = wbLog.addWorksheet('Herleidbaarheid');
+    wsLog.columns = [
+      {header:'Artikelnummer', key:'artnr', width:20},
+      {header:'Veld', key:'veld', width:22},
+      {header:'Bron/methode', key:'bron', width:30},
+      {header:'Toelichting', key:'toelichting', width:60},
+    ];
+    wsLog.getRow(1).font = {bold:true};
+    for(const entry of herleidbaarheidsLog) wsLog.addRow(entry);
+    const bufLog = await wbLog.xlsx.writeBuffer();
+    url3 = URL.createObjectURL(new Blob([bufLog], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  }
+
+  document.getElementById('summary').style.display='grid';
+  document.getElementById('summary').innerHTML = `
+    <div class="metric"><div class="n">${results.length}</div><div class="l">Artikelen</div></div>
+    <div class="metric ${nGeenSalescode?'warn':''}"><div class="n">${results.length-nGeenSalescode}</div><div class="l">Salescode gevonden</div></div>
+    <div class="metric ${nGeenNav?'warn':''}"><div class="n">${results.length-nGeenNav}</div><div class="l">Navigatiecat. gevonden</div></div>
+    <div class="metric"><div class="n">${results.filter(r=>r.salescode&&!r.salescodeGeldig).length}</div><div class="l">Salescode ongeldig</div></div>
+  `;
+  document.getElementById('downloads').style.display='flex';
+  document.getElementById('downloads').innerHTML = `
+    <a class="dl" href="${url1}" download="Workflow deel 1 - ingevuld.xlsx"><i>&#8681;</i> Deel 1 downloaden</a>
+    <a class="dl" href="${url2}" download="Workflow deel 2 - ingevuld.xlsx"><i>&#8681;</i> Deel 2 downloaden</a>
+    ${url3 ? `<a class="dl" href="${url3}" download="Herleidbaarheid - afgeleide velden.xlsx"><i>&#8681;</i> Herleidbaarheid downloaden (${herleidbaarheidsLog.length})</a>` : ''}
+  `;
+  document.getElementById('footnote').style.display='block';
+  log(`Klaar. Downloads staan klaar hierboven.${herleidbaarheidsLog.length ? ` ${herleidbaarheidsLog.length} afgeleide/gegokte velden gelogd.` : ''}`);
+  btn.disabled = false;
+}
+
+// Kruisje-knopjes: laat een geüpload bestand met één klik wissen (ook uit IndexedDB indien onthouden).
+const CLEAR_CONFIG = {
+  sales:   { stateFields:['sales'],   dbKeys:['sales'] },
+  klas:    { stateFields:['klas'],    dbKeys:['klas'] },
+  groep:   { stateFields:['groep'],   dbKeys:['groep'] },
+  leveranciers: { stateFields:['leveranciers'], dbKeys:['leveranciers'] },
+  cn:      { stateFields:['cnParsed'],dbKeys:['cn','cn_parsed'] },
+  t1:      { stateFields:['t1','t1HasData'], dbKeys:['t1'] },
+  t2:      { stateFields:['t2','t2HasData'], dbKeys:['t2'] },
+  pab:     { stateFields:['pab'],     dbKeys:[] },
+  leverancierlijst: { stateFields:['leverancierlijst','leverancierlijstLookup'], dbKeys:[] }
+};
+document.querySelectorAll('.clear-btn').forEach(btn=>{
+  btn.addEventListener('click', async (e)=>{
+    e.stopPropagation();
+    const dropEl = btn.closest('.drop');
+    const key = btn.dataset.key;
+    const cfg = CLEAR_CONFIG[key];
+    if(!cfg) return;
+    for(const veld of cfg.stateFields) state[veld] = undefined;
+    for(const dbKey of cfg.dbKeys) await dbDelete(dbKey);
+    dropEl.classList.remove('filled');
+    const fileSpan = dropEl.querySelector('.file');
+    fileSpan.textContent = fileSpan.dataset.default || fileSpan.textContent;
+    const input = dropEl.querySelector('input[type="file"]');
+    if(input) input.value = '';
+    checkReady();
+  });
+});
+
+document.getElementById('btn-run').addEventListener('click', run);
+</script>
+</body>
+</html>
