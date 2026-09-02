@@ -96,6 +96,7 @@
       <div class="drop" id="drop-groep"><span class="clear-btn" data-key="groep">&times;</span><span class="label">Salesgroepen overzicht</span><span class="file" data-default=".xlsx — klik of sleep">.xlsx — klik of sleep</span><input type="file" id="f-groep" accept=".xlsx,.xls"><span class="persist-tag">wordt onthouden</span></div>
       <div class="drop" id="drop-cn"><span class="clear-btn" data-key="cn">&times;</span><span class="label">Goederencodes (intrastat)</span><span class="file" data-default=".pdf (EU-tarieflijst) of .xlsx — optioneel">.pdf (EU-tarieflijst) of .xlsx — optioneel</span><input type="file" id="f-cn" accept=".xlsx,.xls,.pdf"><span class="persist-tag">wordt onthouden</span></div>
       <div class="drop" id="drop-leveranciers"><span class="clear-btn" data-key="leveranciers">&times;</span><span class="label">Leveranciers (nummers)</span><span class="file" data-default=".xlsx — Plieger leveranciersnummers">.xlsx — Plieger leveranciersnummers</span><input type="file" id="f-leveranciers" accept=".xlsx,.xls"><span class="persist-tag">wordt onthouden</span></div>
+      <div class="drop" id="drop-merkconfig"><span class="clear-btn" data-key="merkConfig">&times;</span><span class="label">Merk-config (optioneel)</span><span class="file" data-default=".json — interne salescode-koppelingen, blijft lokaal">.json — interne salescode-koppelingen, blijft lokaal</span><input type="file" id="f-merkconfig" accept=".json"><span class="persist-tag">wordt onthouden</span></div>
       <div style="display:flex; align-items:center; justify-content:center; color:#8a8d7f; font-size:12px;">↑ eenmalig, blijft daarna bewaard in deze browser</div>
     </div>
   </div>
@@ -163,7 +164,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
-const state = { sales:null, klas:null, groep:null, cn:null, cnParsed:null, t1:null, t2:null, pab:null, t1HasData:false, t2HasData:false };
+const state = { sales:null, klas:null, groep:null, cn:null, cnParsed:null, t1:null, t2:null, pab:null, t1HasData:false, t2HasData:false, merkConfig:null };
 
 function log(msg){
   const el = document.getElementById('log');
@@ -279,11 +280,15 @@ async function dbDelete(key){
 }
 
 async function tryLoadPersisted(){
-  const keys = {sales:'drop-sales', klas:'drop-class', groep:'drop-groep', leveranciers:'drop-leveranciers', cn:'drop-cn', t1:'drop-t1', t2:'drop-t2'};
+  const keys = {sales:'drop-sales', klas:'drop-class', groep:'drop-groep', leveranciers:'drop-leveranciers', cn:'drop-cn', t1:'drop-t1', t2:'drop-t2', merkConfig:'drop-merkconfig'};
   for(const key in keys){
     const rec = await dbGet(key);
     if(rec && rec.buf){
-      state[key] = rec.buf;
+      if(key === 'merkConfig'){
+        try{ state.merkConfig = JSON.parse(new TextDecoder('utf-8').decode(rec.buf)); }catch(e){ continue; }
+      } else {
+        state[key] = rec.buf;
+      }
       setFilled(keys[key], rec.filename + ' (opgeslagen)');
       if(key==='t1') state.t1HasData = await detectExistingRows(state.t1);
       if(key==='t2') state.t2HasData = await detectExistingRows(state.t2);
@@ -319,6 +324,16 @@ wireDrop('drop-sales','f-sales', async (buf,name)=>{ state.sales = buf; dbSet('s
 wireDrop('drop-class','f-class', async (buf,name)=>{ state.klas = buf; dbSet('klas', buf, name); });
 wireDrop('drop-groep','f-groep', async (buf,name)=>{ state.groep = buf; dbSet('groep', buf, name); });
 wireDrop('drop-leveranciers','f-leveranciers', async (buf,name)=>{ state.leveranciers = buf; dbSet('leveranciers', buf, name); });
+wireDrop('drop-merkconfig','f-merkconfig', async (buf,name)=>{
+  try{
+    const tekst = new TextDecoder('utf-8').decode(buf);
+    state.merkConfig = JSON.parse(tekst);
+    dbSet('merkConfig', buf, name);
+    log(`Merk-config geladen: ${name} (blijft lokaal, wordt nooit verzonden).`);
+  }catch(e){
+    log(`Kon merk-config niet lezen als JSON: ${e.message}`);
+  }
+});
 wireDrop('drop-cn','f-cn', async (buf,name)=>{
   state.cn = buf;
   if(/\.pdf$/i.test(name)){
@@ -863,15 +878,14 @@ const HANSGROHE_ETIM_NAV = {
   'EC011535': ['Doucheslang', '01.05.04.05:Doucheslangen:Staged:pliegerProductCatalog', 'DOUCHESLANG'],
   'EC010556': ['Tandenborstelhouder', '01.02:Accessoires:Staged:pliegerProductCatalog', 'TANDENB.HOUD.'],
 };
-// Salescode-fallback per producttype: alleen D-groepen (nieuwe salesgroepen), dominante code binnen
-// die categorie in Salescodes_assortiment.xlsx. Nooit een niet-D-code gebruiken, ook niet als exacte
-// match — die zijn verouderd.
-const HANSGROHE_SALESCODE_FALLBACK = {
-  'EC010862': 'D51', 'EC010551': 'D55', 'EC010161': 'D50', 'EC010109': 'D50', 'EC011327': 'D45',
-  'EC011329': 'D51', 'EC010552': 'D55', 'EC010557': 'D50', 'EC011613': 'D45', 'EC011383': 'D50',
-  'EC010549': 'D55', 'EC010553': 'D55', 'EC010848': 'D56', 'EC011028': 'D55', 'EC010561': 'D56',
-  'EC011535': 'D50', 'EC010556': 'D55',
-};
+// Salescode-fallback per producttype: alleen D-groepen (nieuwe salesgroepen). Deze koppeling bevat
+// Plieger-interne prijscategorie-codes en staat daarom NIET hardgecodeerd in deze (publieke) tool —
+// wordt optioneel geladen uit een lokaal configuratiebestand (state.merkConfig), dat nooit de browser
+// verlaat. Geen bestand geüpload? Dan blijft de salescode leeg in plaats van te gokken.
+function hansgroheSalescodeFallback(etimCode){
+  const cfg = state.merkConfig && state.merkConfig.hansgrohe && state.merkConfig.hansgrohe.salescodeFallbackPerEtim;
+  return cfg ? (cfg[etimCode] || '') : '';
+}
 
 // Haalt (indien aanwezig) een kleur/afwerking-fragment uit vrije tekst: eerst het stuk na de laatste
 // komma (typisch voor PAB-omschrijvingen), anders het eerste zinsdeel dat kleursignaalwoorden bevat.
@@ -1850,7 +1864,7 @@ async function run(){
 
       // 4) Salescode: alleen D-groepen (nieuwe salesgroepen) — niet-D altijd vervangen, ook exacte matches
       if(!salescode || !/^D/i.test(salescode)){
-        const fallback = hgInfo ? HANSGROHE_SALESCODE_FALLBACK[etimCodeKaal] : null;
+        const fallback = hgInfo ? hansgroheSalescodeFallback(etimCodeKaal) : null;
         if(fallback){ salescode = fallback; salescodeOnzeker = true; }
       }
 
@@ -2570,6 +2584,7 @@ const CLEAR_CONFIG = {
   klas:    { stateFields:['klas'],    dbKeys:['klas'] },
   groep:   { stateFields:['groep'],   dbKeys:['groep'] },
   leveranciers: { stateFields:['leveranciers'], dbKeys:['leveranciers'] },
+  merkConfig: { stateFields:['merkConfig'], dbKeys:['merkConfig'] },
   cn:      { stateFields:['cnParsed'],dbKeys:['cn','cn_parsed'] },
   t1:      { stateFields:['t1','t1HasData'], dbKeys:['t1'] },
   t2:      { stateFields:['t2','t2HasData'], dbKeys:['t2'] },
